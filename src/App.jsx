@@ -206,11 +206,23 @@ function ChatApp({ session }) {
   }
 
   async function leaveSpace(item){
-    if(item.owner_id===session.user.id){setError('Transfer server ownership before leaving your own space.');return;}
+    if(item.owner_id===session.user.id){setError('Server owners must use Delete Server.');return;}
     if(!window.confirm('Leave '+item.name+'? You will need a new invite to join again.'))return;
     const {error:e}=await supabase.rpc('mirlume_leave_server',{p_server:item.id});
     if(e){setError(e.message);return;}
     await refreshServers();await loadServerPreferences();
+  }
+
+  async function deleteSpace(item){
+    if(item.owner_id!==session.user.id){setError('Only the server owner can delete this server.');return;}
+    const confirmation=window.prompt('Permanently delete "'+item.name+'" and all its channels and messages for everyone?\\n\\nType the server name exactly to confirm:');
+    if(confirmation===null)return;
+    if(confirmation!==item.name){setError('Deletion canceled: server name did not match.');return;}
+    const {error:e}=await supabase.rpc('mirlume_delete_server',{p_server:item.id});
+    if(e){setError('Could not delete server: '+e.message);return;}
+    setServerContext(null);
+    await refreshServers();
+    await loadServerPreferences();
   }
 
   const sortedServers=useMemo(()=>[...servers].sort((a,b)=>{
@@ -257,9 +269,9 @@ function ChatApp({ session }) {
         {label:'Remove from folder',onClick:()=>saveServerPreference(item.id,{folder_name:'',favorite:false})}
       ]},
       {divider:true},
-      {label:'Leave Server',icon:LeaveIcon,danger:true,
-        disabled:item.owner_id===session.user.id,description:item.owner_id===session.user.id?'Transfer ownership first':undefined,
-        onClick:()=>leaveSpace(item)}
+      item.owner_id===session.user.id
+        ? {label:'Delete Server',icon:LeaveIcon,danger:true,description:'Permanently delete this server',onClick:()=>deleteSpace(item)}
+        : {label:'Leave Server',icon:LeaveIcon,danger:true,onClick:()=>leaveSpace(item)}
     ];
   }
   const server = useMemo(() => servers.find((s) => s.id === activeServerId), [servers, activeServerId]);
