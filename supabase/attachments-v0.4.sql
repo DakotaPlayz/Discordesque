@@ -129,6 +129,11 @@ begin
 end $$;
 create index if not exists idx_dm_file_transfers on public.file_transfers(conversation_id, created_at desc);
 
+-- Earlier v0.2 server-to-server P2P offers are no longer permitted.
+-- This prevents older clients from bypassing the 50 MB server file cap.
+drop policy if exists "Members can propose files to fellow members"
+  on public.file_transfers;
+
 drop policy if exists "Mirlume DM peers may offer files" on public.file_transfers;
 create policy "Mirlume DM peers may offer files"
 on public.file_transfers for insert to authenticated with check (
