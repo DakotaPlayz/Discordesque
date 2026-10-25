@@ -21,7 +21,7 @@ function InitialAvatar({ name, own = false, size = 'normal', path }) {
   return <PersonAvatar name={name} own={own} path={path} className={'dm-avatar '+size}/>;
 }
 
-export default function DirectMessages({ session, servers, displayName, profile, openProfile, sidebarOpen, setSidebarOpen }) {
+export default function DirectMessages({ session, servers, displayName, profile, openProfile, sidebarOpen, setSidebarOpen, targetPeer }) {
   const uid = session.user.id;
   const [threads, setThreads] = useState([]);
   const [preferences,setPreferences] = useState({});
@@ -255,6 +255,20 @@ export default function DirectMessages({ session, servers, displayName, profile,
     } catch (err) { setError(err.message || 'Unable to create conversation. Check that the DM migration is installed.'); }
     finally { setBusy(false); }
   };
+
+  useEffect(()=>{
+    if(!targetPeer?.id)return;
+    let cancelled=false;
+    async function openRequestedDm(){
+      const {data,error:e}=await supabase.rpc('start_direct_message',{p_peer:targetPeer.id});
+      if(cancelled)return;
+      if(e){setError('Could not start DM: '+e.message);return;}
+      setFriendsView(false);
+      await refreshThreads(data);
+    }
+    openRequestedDm();
+    return()=>{cancelled=true;};
+  },[targetPeer?.request, targetPeer?.id, refreshThreads]);
 
   const send = async (event) => {
     event?.preventDefault();
