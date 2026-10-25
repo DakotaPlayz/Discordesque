@@ -9,7 +9,7 @@ import path from 'node:path';
 const root=path.resolve(process.env.MIRLUME_STORAGE_DIR||'./mirlume-storage');
 const metaDir=path.join(root,'meta'), dataDir=path.join(root,'data');
 const quota=Number(process.env.MIRLUME_QUOTA_BYTES||500_000_000_000);
-const retentionDays=Number(process.env.MIRLUME_RETENTION_DAYS||7);
+const retentionDays=Number(process.env.MIRLUME_RETENTION_DAYS||1);
 const maxFile=20*1024**3, maxChunk=8*1024**2;
 const ttl=retentionDays*86400*1000;
 const origins=(process.env.MIRLUME_ALLOWED_ORIGINS||'https://dakotaplayz.github.io,http://localhost:5173,capacitor://localhost,http://localhost,null').split(',').map(x=>x.trim());
