@@ -157,3 +157,27 @@ revoke all on function public.mirlume_set_server_branding(uuid,text,text,text) f
 grant execute on function public.mirlume_media_allowed(text,text,boolean) to authenticated;
 grant execute on function public.mirlume_member_media_allowed(text,boolean) to authenticated;
 grant execute on function public.mirlume_set_server_branding(uuid,text,text,text) to authenticated;
+
+
+-- Use narrow RPCs rather than allowing arbitrary updates of membership keys.
+create or replace function public.mirlume_set_member_identity(
+ p_server uuid, p_nickname text, p_bio text, p_avatar text
+)
+returns boolean language plpgsql security definer set search_path=''
+as $$
+begin
+  if not public.is_server_member(p_server) then raise exception 'Server membership required'; end if;
+  if p_nickname is not null and char_length(btrim(p_nickname)) not between 2 and 32
+    then raise exception 'Nickname must be 2 to 32 characters'; end if;
+  if char_length(coalesce(p_bio,''))>300 then raise exception 'Server bio too long'; end if;
+  if p_avatar is not null and p_avatar !~* (
+    '^members/'||p_server::text||'/'||auth.uid()::text||'/[0-9a-f-]{36}$')
+    then raise exception 'Invalid member avatar'; end if;
+  update public.server_members
+  set nickname = nullif(btrim(p_nickname),''),
+    server_bio=coalesce(p_bio,''), server_avatar_path=p_avatar
+  where server_id=p_server and user_id=auth.uid();
+  return found;
+end $$;
+revoke all on function public.mirlume_set_member_identity(uuid,text,text,text) from public;
+grant execute on function public.mirlume_set_member_identity(uuid,text,text,text) to authenticated;
