@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { configured, confirmationUrl, supabase } from './lib/supabase.js';
 import FileTransfers from './components/FileTransfers.jsx';
+import DirectMessages from './components/DirectMessages.jsx';
 
 function initials(name) {
   return (name || '?').slice(0, 2).toUpperCase();
@@ -22,7 +23,7 @@ function Brand({ compact = false }) {
   return (
     <div className="brand">
       <div className="brand-icon"><MessageCircle size={25} strokeWidth={2.6} /></div>
-      {!compact && <span>Discordesque</span>}
+      {!compact && <span>Mirlume</span>}
     </div>
   );
 }
@@ -64,7 +65,7 @@ function AuthScreen() {
         : await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (result.error) throw result.error;
       if (register && !result.data.session) {
-        setNotice('Check your email and open the verification link. It leads to our free Discordesque website, then you can sign in here on any device.');
+        setNotice('Check your email and open the verification link. It leads to our free Mirlume website, then you can sign in here on any device.');
       } else if (register) {
         setNotice('Account created. Signing you in...');
       }
@@ -94,7 +95,7 @@ function AuthScreen() {
         <input id="password" type="password" autoComplete={register ? 'new-password' : 'current-password'} minLength={6} placeholder="At least 6 characters" value={password} onChange={(e) => setPassword(e.target.value)} required />
         {notice && <div className="inline-notice" role="status">{notice}</div>}
         <button className="primary-button wide" type="submit" disabled={pending}>{pending ? 'Working...' : register ? 'Create account' : 'Sign in'} <ArrowRight size={18} /></button>
-        <div className="auth-toggle">{register ? 'Already have an account?' : 'New to Discordesque?'} <button type="button" className="link-button" onClick={() => { setRegister(!register); setNotice(''); }}>{register ? 'Sign in' : 'Create an account'}</button></div>
+        <div className="auth-toggle">{register ? 'Already have an account?' : 'New to Mirlume?'} <button type="button" className="link-button" onClick={() => { setRegister(!register); setNotice(''); }}>{register ? 'Sign in' : 'Create an account'}</button></div>
       </form>
     </div>
   );
@@ -102,12 +103,15 @@ function AuthScreen() {
 
 function Dialog({ title, children, onClose }) {
   const dialogRef = useRef(null);
+  // Keep the latest close callback, but only attach the handler once.
+  // Previously focusing the dialog on every render stole focus after each keystroke.
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
-    const onKey = (event) => { if (event.key === 'Escape') onClose(); };
+    const onKey = (event) => { if (event.key === 'Escape') closeRef.current(); };
     window.addEventListener('keydown', onKey);
-    dialogRef.current?.focus();
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, []);
   return (
     <div className="dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <section className="dialog" role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} ref={dialogRef}>
@@ -137,13 +141,13 @@ function ConfirmationScreen({ session, onContinue }) {
         <div className="eyebrow">{success ? 'ACCOUNT VERIFIED' : 'CONFIRMATION LINK'}</div>
         <h1>{success ? 'Email confirmed!' : 'Could not confirm your email'}</h1>
         <p>{success
-          ? 'You are all set. Your email is verified, and your Discordesque account can now sign in across Windows, Android, iOS and the web.'
+          ? 'You are all set. Your email is verified, and your Mirlume account can now sign in across Windows, Android, iOS and the web.'
           : linkError
-            ? 'That confirmation link may be invalid or expired. Return to Discordesque and try signing in, or request a new verification email.'
+            ? 'That confirmation link may be invalid or expired. Return to Mirlume and try signing in, or request a new verification email.'
             : 'We could not find an authenticated session from that link. Please check the newest confirmation email and try again.'}</p>
         {success ? (
           <>
-            <button className="primary-button wide" onClick={onContinue}>Continue to Discordesque <ArrowRight size={17}/></button>
+            <button className="primary-button wide" onClick={onContinue}>Continue to Mirlume <ArrowRight size={17}/></button>
             <p className="small-note">Using the app on your phone or computer? Return to that app and sign in with the email and password you registered.</p>
           </>
         ) : <button className="primary-button wide" onClick={onContinue}>Go to sign in <ArrowRight size={17}/></button>}
@@ -154,6 +158,7 @@ function ConfirmationScreen({ session, onContinue }) {
 
 function ChatApp({ session }) {
   const [profile, setProfile] = useState(null);
+  const [dmMode, setDmMode] = useState(false);
   const [servers, setServers] = useState([]);
   const [channels, setChannels] = useState([]);
   const [activeServerId, setActiveServerId] = useState(null);
@@ -336,6 +341,7 @@ function ChatApp({ session }) {
   }
 
   function selectServer(id) {
+    setDmMode(false);
     setActiveServerId(id);
     setMobileSidebar(true);
     setError('');
@@ -358,7 +364,7 @@ function ChatApp({ session }) {
   return (
     <div className={'app-shell' + (mobileSidebar ? ' show-sidebar' : '')}>
       <nav className="server-rail" aria-label="Servers">
-        <div className="rail-brand" title="Discordesque"><Brand compact /></div>
+        <button type="button" className={'rail-brand rail-home' + (dmMode ? ' selected' : '')} title="Direct messages" aria-label="Direct messages" onClick={() => { setDmMode(true); setMobileSidebar(true); setError(''); }}><Brand compact /></button>
         <div className="rail-rule" />
         <div className="server-list">
           {servers.map((item) => (
@@ -371,6 +377,9 @@ function ChatApp({ session }) {
         <button className="server-bubble join-server" title="Join a space" aria-label="Join a space" onClick={() => openDialog('join')}><ArrowRight size={21} /></button>
       </nav>
 
+      {dmMode ? <DirectMessages session={session} servers={servers} displayName={currentName}
+        openProfile={() => openDialog('profile')} sidebarOpen={mobileSidebar}
+        setSidebarOpen={setMobileSidebar}/> : <>
       <aside className="channel-sidebar">
         <div className="server-header"><strong>{server?.name || 'Your spaces'}</strong><button className="icon-button" title="Server invitation" aria-label="Server invitation" onClick={() => openDialog(server ? 'invite' : 'join')}><UsersRound size={19} /></button></div>
         {server ? (
@@ -426,6 +435,7 @@ function ChatApp({ session }) {
         {error && <div className="error-banner" role="alert">{error}<button aria-label="Dismiss error" onClick={() => setError('')}><X size={16} /></button></div>}
         {channel && <form className="composer-area" onSubmit={sendMessage}><div className="composer"><FileTransfers session={session} server={server} channel={channel} /><textarea value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={2000} rows={1} placeholder={'Message #' + channel.name} aria-label="Message" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); sendMessage(); } }} /><button type="submit" className="send-button" aria-label="Send message" disabled={!draft.trim() || pending}><Send size={19} /></button></div><p className="composer-tip">Enter to send · Shift+Enter for a new line</p></form>}
       </main>
+      </>}
 
       {modal && <Dialog title={dialogTitle[modal]} onClose={() => setModal('')}>
         {modal === 'invite' ? (
