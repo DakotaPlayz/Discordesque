@@ -34,6 +34,10 @@ async function authenticate(request, env) {
   if(!res.ok){
     if(res.status===401)throw error('Supabase rejected the session. Check that the Worker and app use the same Supabase project.',401);
     if(res.status===403)throw error('Supabase rejected the Worker API key. Check SUPABASE_ANON_KEY in Cloudflare.',503);
+    if(res.status===530){
+      const cfCode=res.headers.get('cf-error-type');
+      throw error('Cloudflare could not resolve the Supabase hostname (HTTP 530'+(cfCode?', error '+cfCode:'')+'). Verify SUPABASE_URL exactly matches the project URL in Supabase Dashboard.',502);
+    }
     throw error('Supabase authentication check failed (HTTP '+res.status+'). Verify Cloudflare Supabase settings.',502);
   }
   const user = await res.json();
