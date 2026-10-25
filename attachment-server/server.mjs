@@ -76,6 +76,11 @@ async function upload(req,res,id,principal,query){
     reply(res,200,{uploaded_bytes:info.uploaded_bytes,state:info.state});
   }finally{if(handle)await handle.close().catch(()=>{});locks.delete(id);}
 }
+async function uploadStatus(res,id,principal){
+  const info=await authorized(id,principal);
+  if(info.uploader_id!==principal.id)throw problem('Only sender may inspect upload state',403);
+  reply(res,200,{id:info.id,uploaded_bytes:info.uploaded_bytes,state:info.state});
+}
 async function entries(res,conversation,principal){
   await membership(conversation,principal.token);
   const files=(await listAll()).filter(f=>f.conversation_id===conversation&&f.expires_at>Date.now()).sort((a,b)=>b.created_at-a.created_at).slice(0,60);
@@ -119,8 +124,9 @@ const server=createServer(async(req,res)=>{
     if(req.method==='POST'&&query.pathname==='/v1/files')return await initialize(req,res,principal);
     const listing=/^\/v1\/conversations\/([0-9a-f-]+)\/files$/i.exec(query.pathname);
     if(req.method==='GET'&&listing)return await entries(res,listing[1],principal);
-    const file=/^\/v1\/files\/([0-9a-f-]+)(\/data)?$/i.exec(query.pathname);
-    if(file&&req.method==='PUT'&&file[2])return await upload(req,res,file[1],principal,query);
+    const file=/^\/v1\/files\/([0-9a-f-]+)(\/data|\/status)?$/i.exec(query.pathname);
+    if(file&&req.method==='PUT'&&file[2]==='/data')return await upload(req,res,file[1],principal,query);
+    if(file&&req.method==='GET'&&file[2]==='/status')return await uploadStatus(res,file[1],principal);
     if(file&&req.method==='GET'&&!file[2])return await download(req,res,file[1],principal);
     if(file&&req.method==='DELETE'&&!file[2])return await erase(res,file[1],principal);
     reply(res,404,{error:'Not found'});
