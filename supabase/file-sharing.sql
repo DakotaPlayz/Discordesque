@@ -45,7 +45,7 @@ with check (
   and public.is_server_member(server_id)
   and exists (
     select 1 from public.channels c
-    where c.id = channel_id and c.server_id = server_id
+    where c.id = file_transfers.channel_id and c.server_id = file_transfers.server_id
   )
   and exists (
     select 1 from public.server_members m
