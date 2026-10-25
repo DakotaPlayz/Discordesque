@@ -202,3 +202,18 @@ a { color: #b5adff; }
 .file-cancel { display:block; background:transparent; border:0; color:#e8a5b4; font-size:12px; margin:12px auto 0; padding:7px; }
 .file-error { border:1px solid #985466; background:#4f303d; border-radius:9px; padding:10px; color:#ffd5df; font-size:12px; line-height:1.5; overflow-wrap:anywhere; }
 @media(max-width:700px) { .file-popover { position:fixed; left:10px; bottom:85px; width:calc(100vw - 20px); max-height:75dvh; } }
+
+
+/* Friends view */
+.mirlume-friends-panel{padding:28px;max-width:850px;margin:auto;width:100%;overflow:auto}
+.mirlume-friends-panel h2{font-size:26px;margin:0 0 8px}
+.mirlume-friends-panel h3{font-size:15px;margin:25px 0 10px}
+.mirlume-friends-panel p{opacity:.75}
+.mirlume-friend-search{display:flex;gap:10px;margin:18px 0}
+.mirlume-friend-search input{flex:1;min-width:0;background:var(--surface,#242630);color:inherit;border:1px solid #7776;border-radius:8px;padding:11px}
+.mirlume-friend-search button,.mirlume-friend-actions button{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid #7776;border-radius:8px;padding:8px 11px;color:inherit;background:#80808020;cursor:pointer}
+.mirlume-friend-search button:hover,.mirlume-friend-actions button:hover{background:#80808040}
+.mirlume-friend-actions button:disabled{opacity:.5;cursor:wait}
+.mirlume-friend-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border-bottom:1px solid #7774}
+.mirlume-friend-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+@media(max-width:640px){.mirlume-friends-panel{padding:16px}.mirlume-friend-item{align-items:flex-start;flex-direction:column}}
