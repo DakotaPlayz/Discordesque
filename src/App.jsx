@@ -6,6 +6,7 @@ import {
 import { configured, confirmationUrl, supabase } from './lib/supabase.js';
 import { ChannelAttachments, ChannelUpload } from './components/ChannelAttachments.jsx';
 import DirectMessages from './components/DirectMessages.jsx';
+import {IdentityStudio,PersonAvatar,MediaImage,ProfilePeek} from './components/IdentityStudio.jsx';
 
 function initials(name) {
   return (name || '?').slice(0, 2).toUpperCase();
@@ -159,6 +160,8 @@ function ConfirmationScreen({ session, onContinue }) {
 function ChatApp({ session }) {
   const [profile, setProfile] = useState(null);
   const [dmMode, setDmMode] = useState(false);
+  const [memberProfiles,setMemberProfiles] = useState({});
+  const [peek,setPeek] = useState(null);
   const [servers, setServers] = useState([]);
   const [channels, setChannels] = useState([]);
   const [activeServerId, setActiveServerId] = useState(null);
@@ -182,7 +185,7 @@ function ChatApp({ session }) {
   const refreshServers = useCallback(async (preferredId) => {
     const { data, error: loadError } = await supabase
       .from('servers')
-      .select('id, name, owner_id, invite_code')
+      .select('id, name, owner_id, invite_code, description, icon_path, banner_path')
       .order('created_at', { ascending: true });
     if (loadError) { setError(loadError.message); return; }
     const list = data || [];
@@ -210,7 +213,7 @@ function ChatApp({ session }) {
   const refreshMessages = useCallback(async (channelId) => {
     if (!channelId) { setMessages([]); return; }
     const { data, error: loadError } = await supabase.from('messages')
-      .select('id, channel_id, author_id, body, created_at, profiles!messages_author_id_fkey(display_name)')
+      .select('id, channel_id, author_id, body, created_at, profiles!messages_author_id_fkey(display_name, avatar_path, banner_path, bio, pronouns, status_text, accent_color)')
       .eq('channel_id', channelId)
       .order('created_at', { ascending: false })
       .limit(100);
@@ -222,7 +225,7 @@ function ChatApp({ session }) {
     let live = true;
     async function initialize() {
       const { data, error: profileError } = await supabase.from('profiles')
-        .select('id, display_name').eq('id', session.user.id).single();
+        .select('*').eq('id', session.user.id).single();
       if (live && data) setProfile(data);
       if (live && profileError) setError(profileError.message);
       if (live) refreshServers();
@@ -230,6 +233,25 @@ function ChatApp({ session }) {
     initialize();
     return () => { live = false; };
   }, [session.user.id, refreshServers]);
+
+  const refreshMemberProfiles=useCallback(async()=>{
+    if(!activeServerId){setMemberProfiles({});return;}
+    const {data}=await supabase.from('server_members')
+      .select('user_id,nickname,server_avatar_path,server_bio')
+      .eq('server_id',activeServerId);
+    setMemberProfiles(Object.fromEntries((data||[]).map(p=>[p.user_id,p])));
+  },[activeServerId]);
+
+  useEffect(()=>{refreshMemberProfiles();},[refreshMemberProfiles]);
+
+  const openPeek=async(id)=>{
+    const {data,error:e}=await supabase.from('profiles').select('*').eq('id',id).single();
+    if(e){setError(e.message);return;}
+    const override=memberProfiles[id];
+    setPeek({...data,display_name:override?.nickname||data.display_name,
+      avatar_path:override?.server_avatar_path||data.avatar_path,
+      bio:override?.server_bio||data.bio});
+  };
 
   useEffect(() => {
     setActiveChannelId(null);
@@ -370,7 +392,7 @@ function ChatApp({ session }) {
           {servers.map((item) => (
             <button title={item.name} aria-label={item.name} key={item.id}
               className={'server-bubble' + (item.id === activeServerId ? ' active' : '')}
-              onClick={() => selectServer(item.id)}>{initials(item.name)}</button>
+              onClick={() => selectServer(item.id)}><MediaImage bucket="mirlume-server-media" path={item.icon_path} alt={item.name} className="server-icon-image" fallback={initials(item.name)}/></button>
           ))}
         </div>
         <button className="server-bubble new-server" title="Create a space" aria-label="Create a space" onClick={() => openDialog('create')}><Plus size={24} /></button>
@@ -378,12 +400,22 @@ function ChatApp({ session }) {
       </nav>
 
       {dmMode ? <DirectMessages session={session} servers={servers} displayName={currentName}
-        openProfile={() => openDialog('profile')} sidebarOpen={mobileSidebar}
+        openProfile={() => openDialog('identity')} profile={profile} sidebarOpen={mobileSidebar}
         setSidebarOpen={setMobileSidebar}/> : <>
       <aside className="channel-sidebar">
-        <div className="server-header"><strong>{server?.name || 'Your spaces'}</strong><button className="icon-button" title="Server invitation" aria-label="Server invitation" onClick={() => openDialog(server ? 'invite' : 'join')}><UsersRound size={19} /></button></div>
+        <div className="server-header"><div className="server-heading-text"><strong>{server?.name || 'Your spaces'}</strong>{server?.description&&<small>{server.description}</small>}</div><button className="icon-button" title="Server invitation" aria-label="Server invitation" onClick={() => openDialog(server ? 'invite' : 'join')}><UsersRound size={19} /></button></div>
         {server ? (
           <>
+            <div className="server-showcase">
+              <div className="server-showcase-banner">
+                <MediaImage bucket="mirlume-server-media" path={server.banner_path} alt="Server banner" className="server-banner-image"/>
+              </div>
+              <div className="server-showcase-bottom">
+                <span className="server-showcase-icon"><MediaImage bucket="mirlume-server-media" path={server.icon_path} alt="Server icon" className="server-icon-image" fallback={initials(server.name)}/></span>
+                <span><strong>{server.name}</strong><small>{server.description||'A space for your crew'}</small></span>
+                <button className="icon-button" title="Server identity and appearance" onClick={()=>openDialog('identity')}><Settings2 size={17}/></button>
+              </div>
+            </div>
             <div className="section-heading"><span>TEXT CHANNELS</span>{isOwner && <button className="icon-button" title="Add channel" aria-label="Add channel" onClick={() => openDialog('channel')}><Plus size={17} /></button>}</div>
             <div className="channel-list">{channels.map((item) => (
               <button className={'channel-item' + (activeChannelId === item.id ? ' selected' : '')} key={item.id} onClick={() => selectChannel(item.id)}>
@@ -396,7 +428,7 @@ function ChatApp({ session }) {
         ) : (
           <div className="sidebar-empty"><Sparkles size={26} /><p>Make a space for your crew, or enter their invite code.</p><button className="mini-primary" onClick={() => openDialog('create')}>Create space</button><button className="subtle-link" onClick={() => openDialog('join')}>Join with a code</button></div>
         )}
-        <div className="account-bar"><Avatar name={currentName} own /><div className="account-name"><strong>{currentName}</strong><span>Online</span></div><button className="icon-button" title="Profile settings" aria-label="Profile settings" onClick={() => openDialog('profile')}><Settings2 size={18} /></button><button className="icon-button" title="Sign out" aria-label="Sign out" onClick={() => supabase.auth.signOut()}><LogOut size={18} /></button></div>
+        <div className="account-bar"><PersonAvatar name={currentName} path={profile?.avatar_path} color={profile?.accent_color} own /><div className="account-name"><strong>{currentName}</strong><span>Online</span></div><button className="icon-button" title="Profile settings" aria-label="Profile settings" onClick={() => openDialog('identity')}><Settings2 size={18} /></button><button className="icon-button" title="Sign out" aria-label="Sign out" onClick={() => supabase.auth.signOut()}><LogOut size={18} /></button></div>
       </aside>
 
       <main className="chat">
@@ -413,7 +445,9 @@ function ChatApp({ session }) {
               <div className="channel-intro"><div className="channel-intro-icon"><Hash size={30} /></div><h1>Welcome to #{channel.name}!</h1><p>This is the beginning of the <strong>#{channel.name}</strong> channel.</p></div>
               {loadingMessages && <p className="loading-text">Loading messages...</p>}
               {messages.map((message, index) => {
-                const who = message.profiles?.display_name || (message.author_id === session.user.id ? currentName : 'Member');
+                const member = memberProfiles[message.author_id];
+                const who = member?.nickname || message.profiles?.display_name || (message.author_id === session.user.id ? currentName : 'Member');
+                const avatarPath = member?.server_avatar_path || message.profiles?.avatar_path;
                 const prev = messages[index - 1];
                 const dayChanged = !prev || new Date(prev.created_at).toDateString() !== new Date(message.created_at).toDateString();
                 const compact = !dayChanged && prev?.author_id === message.author_id &&
@@ -422,8 +456,9 @@ function ChatApp({ session }) {
                   <div key={message.id}>
                     {dayChanged && <div className="day-marker"><span>{formatDay(message.created_at)}</span></div>}
                     <article className={'message' + (compact ? ' compact' : '')}>
-                      {compact ? <span className="compact-time">{timeOf(message.created_at)}</span> : <Avatar name={who} own={message.author_id === session.user.id} />}
-                      <div className="message-content">{!compact && <div className="message-meta"><strong>{who}</strong><time>{timeOf(message.created_at)}</time></div>}<div className="message-body">{message.body}</div></div>
+                      {compact ? <span className="compact-time">{timeOf(message.created_at)}</span> :
+                        <button type="button" className="message-profile-trigger" onClick={()=>openPeek(message.author_id)}><PersonAvatar name={who} path={avatarPath} color={message.profiles?.accent_color} own={message.author_id===session.user.id}/></button>}
+                      <div className="message-content">{!compact && <div className="message-meta"><button type="button" className="message-user-link" onClick={()=>openPeek(message.author_id)}>{who}</button><time>{timeOf(message.created_at)}</time></div>}<div className="message-body">{message.body}</div></div>
                     </article>
                   </div>
                 );
@@ -438,8 +473,13 @@ function ChatApp({ session }) {
       </main>
       </>}
 
-      {modal && <Dialog title={dialogTitle[modal]} onClose={() => setModal('')}>
-        {modal === 'invite' ? (
+      {peek && <ProfilePeek person={peek} onClose={()=>setPeek(null)}/>}
+      {modal && <Dialog title={modal==='identity'?'Personalize your Mirlume experience':dialogTitle[modal]} onClose={() => setModal('')}>
+        {modal === 'identity' ? (
+          <IdentityStudio session={session} profile={profile} server={server} isOwner={isOwner}
+            onClose={()=>setModal('')}
+            onSaved={async next=>{if(next)setProfile(next);await refreshServers();await refreshMemberProfiles();if(activeChannelId)await refreshMessages(activeChannelId);}}/>
+        ) : modal === 'invite' ? (
           <div className="modal-content">
             <p>Share this code with your two friends. Anyone who has it can join <strong>{server?.name}</strong>.</p>
             <div className="invite-code"><code>{server?.invite_code}</code><button className="icon-button" title="Copy code" onClick={copyInvite}>{copied ? <Check size={21} /> : <Copy size={21} />}</button></div>

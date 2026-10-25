@@ -39,27 +39,49 @@ function createWindow() {
   win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
 }
 
-// The receiver selects the destination directly in Windows. No Blob accumulation,
-// and no arbitrary filesystem path from the untrusted renderer is accepted.
-ipcMain.handle('file:start', async (event, filename) => {
+// No recipient save prompt: downloads are written to the user's Downloads/Mirlume
+// folder. Always use unpredictable unique names and a temporary .part file,
+// never overwrite a file supplied by a contact.
+ipcMain.handle('file:start', async (event, filename, size) => {
   if (event.sender !== currentWindow?.webContents) throw new Error('Unauthorized file writer.');
-  const safeName = path.basename(String(filename).replace(/\\/g, '/')).slice(0, 255) || 'download.bin';
-  const result = await dialog.showSaveDialog(currentWindow, {
-    title: 'Save incoming Mirlume file',
-    defaultPath: safeName,
-    buttonLabel: 'Save',
-  });
-  if (result.canceled || !result.filePath) return { error: 'Save cancelled.' };
-  const handle = await fs.open(result.filePath, 'w');
+  if (!Number.isSafeInteger(size) || size < 1 || size > 20 * 1024 ** 3) {
+    throw new Error('Invalid transfer size.');
+  }
+  const safeName = path.basename(String(filename).replace(/\\/g, '/'))
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/[. ]+$/g, '').slice(0, 160)
+    || 'download.bin';
+  const baseDir = path.join(app.getPath('downloads'), 'Mirlume');
+  await fs.mkdir(baseDir, { recursive: true });
+  try {
+    const space = await fs.statfs(baseDir);
+    if (Number(space.bavail) * Number(space.bsize) < size + 100 * 1024 ** 2) {
+      throw new Error('Not enough free disk space to auto-download this file.');
+    }
+  } catch (error) {
+    if (String(error.message).includes('Not enough')) throw error;
+    // Filesystem stats are unavailable on some Windows versions.
+  }
+  const suffix = crypto.randomBytes(6).toString('hex');
+  const extension = path.extname(safeName);
+  const stem = safeName.slice(0, safeName.length - extension.length) || 'download';
+  const finalPath = path.join(baseDir, stem + '-' + suffix + extension);
+  const partialPath = finalPath + '.part';
+  const handle = await fs.open(partialPath, 'wx');
   const id = crypto.randomUUID();
-  writers.set(id, { handle, filepath: result.filePath, offset: 0, owner: event.sender.id });
-  return { id };
+  writers.set(id, {
+    handle, filepath: partialPath, finalPath, offset: 0, expectedSize: size,
+    owner: event.sender.id,
+  });
+  return { id, filename: path.basename(finalPath), location: 'Downloads/Mirlume' };
 });
 
 ipcMain.handle('file:write', async (event, id, bytes) => {
   const writer = writers.get(id);
   if (!writer || writer.owner !== event.sender.id) throw new Error('Unknown transfer.');
   const buffer = Buffer.from(bytes);
+  if (writer.offset + buffer.length > writer.expectedSize) {
+    throw new Error('Incoming file exceeded announced size.');
+  }
   // FileHandle.write() can write fewer bytes; loop until the full segment is on disk.
   let count = 0;
   while (count < buffer.length) {
@@ -74,9 +96,11 @@ ipcMain.handle('file:write', async (event, id, bytes) => {
 ipcMain.handle('file:finish', async (event, id) => {
   const writer = writers.get(id);
   if (!writer || writer.owner !== event.sender.id) throw new Error('Unknown transfer.');
+  if (writer.offset !== writer.expectedSize) throw new Error('File is incomplete.');
   writers.delete(id);
   await writer.handle.close();
-  return { saved: true, size: writer.offset };
+  await fs.rename(writer.filepath, writer.finalPath);
+  return { saved: true, size: writer.offset, filename: path.basename(writer.finalPath) };
 });
 
 ipcMain.handle('file:cancel', async (event, id) => {

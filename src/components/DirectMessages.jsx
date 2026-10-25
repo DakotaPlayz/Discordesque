@@ -5,19 +5,22 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase.js';
 import FileTransfers from './FileTransfers.jsx';
+import {PersonAvatar,ProfilePeek} from './IdentityStudio.jsx';
 
 const formatTime = (date) => new Date(date).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 const formatDay = (date) => new Date(date).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
 const short = (name) => String(name || '?').trim().slice(0, 2).toUpperCase();
 
-function InitialAvatar({ name, own = false, size = 'normal' }) {
-  return <div className={'dm-avatar ' + (own ? 'mine ' : '') + size} aria-hidden="true">{short(name)}</div>;
+function InitialAvatar({ name, own = false, size = 'normal', path }) {
+  return <PersonAvatar name={name} own={own} path={path} className={'dm-avatar '+size}/>;
 }
 
-export default function DirectMessages({ session, servers, displayName, openProfile, sidebarOpen, setSidebarOpen }) {
+export default function DirectMessages({ session, servers, displayName, profile, openProfile, sidebarOpen, setSidebarOpen }) {
   const uid = session.user.id;
   const [threads, setThreads] = useState([]);
   const [nameMap, setNameMap] = useState({});
+  const [peerMap, setPeerMap] = useState({});
+  const [peek,setPeek] = useState(null);
   const [activeId, setActiveId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState('');
@@ -46,8 +49,9 @@ export default function DirectMessages({ session, servers, displayName, openProf
     setThreads(rows);
     const contacts = [...new Set(rows.map(row => row.user_low === uid ? row.user_high : row.user_low))];
     if (contacts.length) {
-      const { data: users } = await supabase.from('profiles').select('id,display_name').in('id', contacts);
-      setNameMap(old => ({ ...old, ...Object.fromEntries((users || []).map(p => [p.id, p.display_name])) }));
+      const { data: users } = await supabase.from('profiles').select('*').in('id', contacts);
+      setNameMap(old=>({...old,...Object.fromEntries((users||[]).map(p=>[p.id,p.display_name]))}));
+      setPeerMap(old=>({...old,...Object.fromEntries((users||[]).map(p=>[p.id,p]))}));
     }
     if (selected) setActiveId(selected);
   }, [uid]);
@@ -160,7 +164,7 @@ export default function DirectMessages({ session, servers, displayName, openProf
           const name = nameMap[id] || 'Member';
           return <button key={thread.id} className={'dm-thread' + (activeId === thread.id ? ' selected' : '')}
             type="button" onClick={() => { setActiveId(thread.id); setSidebarOpen(false); }}>
-            <InitialAvatar name={name} size="small"/>
+            <InitialAvatar name={name} size="small" path={peerMap[id]?.avatar_path}/>
             <span className="dm-thread-text"><strong>{name}</strong><small>Direct message</small></span>
           </button>;
         })}
@@ -168,7 +172,7 @@ export default function DirectMessages({ session, servers, displayName, openProf
       </div>
       <div className="sidebar-spacer"/>
       <div className="account-bar">
-        <InitialAvatar name={displayName} own size="small"/>
+        <InitialAvatar name={displayName} own size="small" path={profile?.avatar_path}/>
         <div className="account-name"><strong>{displayName}</strong><span>Available</span></div>
         <button type="button" className="icon-button" title="Profile" aria-label="Profile settings" onClick={openProfile}><Settings2 size={18}/></button>
         <button type="button" className="icon-button" title="Sign out" aria-label="Sign out" onClick={() => supabase.auth.signOut()}><LogOut size={18}/></button>
@@ -178,7 +182,7 @@ export default function DirectMessages({ session, servers, displayName, openProf
     <main className="chat dm-chat">
       <header className="chat-header">
         <button className="icon-button menu-button" title="Show messages" aria-label="Show conversations" onClick={() => setSidebarOpen(true)}><Menu size={21}/></button>
-        {active ? <><InitialAvatar name={peerName} size="tiny"/><strong>{peerName}</strong><span className="header-divider"/><span className="header-description">Private conversation</span></>
+        {active ? <><button type="button" className="profile-icon-button" onClick={()=>setPeek(peerMap[activePerson]||null)}><InitialAvatar name={peerName} size="tiny" path={peerMap[activePerson]?.avatar_path}/></button><strong>{peerName}</strong><span className="header-divider"/><span className="header-description">Private conversation</span></>
           : <><MessageCircle className="header-hash" size={21}/><strong>Direct Messages</strong><span className="header-description">A quieter place to connect</span></>}
         <div className="chat-header-right"><ShieldCheck size={16}/> Private</div>
       </header>
@@ -191,8 +195,9 @@ export default function DirectMessages({ session, servers, displayName, openProf
           <button type="button" className="primary-button" onClick={openPicker}>Start a conversation <ArrowRight size={17}/></button>
         </div> : <div className="message-inner">
           <div className="channel-intro">
-            <InitialAvatar name={peerName}/>
+            <button type="button" className="profile-icon-button" onClick={()=>setPeek(peerMap[activePerson]||null)}><InitialAvatar name={peerName} path={peerMap[activePerson]?.avatar_path}/></button>
             <h1>{peerName}</h1>
+            {peerMap[activePerson]?.bio&&<p className="dm-about">{peerMap[activePerson].bio}</p>}
             <p>This is the start of your private conversation. Say hello!</p>
           </div>
           {loading && <p className="loading-text">Loading messages…</p>}
@@ -206,14 +211,15 @@ export default function DirectMessages({ session, servers, displayName, openProf
             return <div key={msg.id}>
               {dayChange && <div className="day-marker"><span>{formatDay(msg.created_at)}</span></div>}
               <article className={'message' + (compact ? ' compact' : '')}>
-                {compact ? <span className="compact-time">{formatTime(msg.created_at)}</span> : <InitialAvatar name={name} own={isMine} size="small"/>}
+                {compact ? <span className="compact-time">{formatTime(msg.created_at)}</span> : <button type="button" className="message-profile-trigger" onClick={()=>setPeek(isMine?profile:(peerMap[activePerson]||null))}><InitialAvatar name={name} own={isMine} size="small" path={isMine?profile?.avatar_path:peerMap[activePerson]?.avatar_path}/></button>}
                 <div className="message-content">
-                  {!compact && <div className="message-meta"><strong>{name}</strong><time>{formatTime(msg.created_at)}</time></div>}
+                  {!compact && <div className="message-meta"><button type="button" className="message-user-link" onClick={()=>setPeek(isMine?profile:(peerMap[activePerson]||null))}>{name}</button><time>{formatTime(msg.created_at)}</time></div>}
                   <div className="message-body">{msg.body}</div>
                 </div>
               </article>
             </div>;
           })}
+          <div id={'dm-file-panel-'+activeId} className="dm-message-files"/>
           <div ref={scrollEnd}/>
         </div>}
       </div>
@@ -230,6 +236,7 @@ export default function DirectMessages({ session, servers, displayName, openProf
       </form>}
     </main>
 
+    {peek && <ProfilePeek person={peek} onClose={()=>setPeek(null)}/>}
     {picker && <div className="dialog-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) setPicker(false); }}>
       <section className="dialog dm-picker" role="dialog" aria-modal="true" aria-label="New direct message">
         <header><h2>New message</h2><button type="button" className="icon-button" aria-label="Close" onClick={() => setPicker(false)}><X size={20}/></button></header>
