@@ -30,6 +30,18 @@ Both `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` must exist as **repository
 
 In each completed run, open **Artifacts** to download the Windows EXE package or Android debug APK. Check the logs if a workflow is red; an artifact should not be assumed until GitHub reports that it built successfully.
 
+## Context menus and 24-hour hosted attachments (v0.5.2)
+
+**Right-click a server icon** for read state, invite code, mute duration, saved notification preferences, privacy preferences, per-server identity, folder/favorites organization and Leave Server (non-owners only). **Right-click a DM** for pinned/favorites, profile, private note, private nickname, close DM, DM invites, ignore, block and mute. Apps, safety/verification codes and friend removal are visibly disabled until supported; channel-specific hide/show is also not yet supported. This is a Mirlume-original context menu design, not a copy of Discord graphics.
+
+Run the [one-time menu SQL migration](supabase/context-menus-v0.5.2.sql) after the original schema, DMs and v0.5 profile migrations. It creates RLS-protected per-user preferences and a DM block enforcement rule, plus a safe server-leave function. All account profiles and messages remain intact.
+
+**Hosted file expiry defaults to 24 hours.** The optional [Node self-hosted attachment server](attachment-server/README.md) has a 24-hour default retention; new uploads expire one day after creation. Existing older objects may retain their stored older expiration timestamps unless explicitly cleaned.
+
+**For no always-on personal PC**, deploy the optional [Cloudflare R2 attachment Worker](attachment-server/cloudflare-r2/README.md). It connects to the same Supabase account and enables offline 20 GiB DM downloads using a real cloud provider. The free tier is only **10 GB-month**, not 500 GB. You pay for actual stored volume above that amount; expect approximately $7.35/month in storage fees when 500 GB remains occupied continuously, subject to pricing and operations. The Worker imposes a 500 GB soft cap, 40-file private beta limit and 24-hour expiration. The project does **not** provision a Cloudflare account or activate billing on your behalf.
+
+Set `VITE_ATTACHMENT_SERVER_URL` as a GitHub Actions **variable** pointing to the HTTPS Worker URL, then rerun Pages/Windows/Android builds. Without this value, Mirlume still uses the existing peer-to-peer file-sharing mode. Changing code or enabling GitHub Pages alone does not allocate hosted storage.
+
 ## Optional 500 GB hosted DM attachments (self-hosted, not included cloud space)
 
 **For true offline delivery**, there is an independent authenticated [Mirlume Attachment Server](attachment-server/README.md). Unlike peer-to-peer transfers, file bytes are stored on the always-on attachment server so the sender can sign out or turn off their device, and the recipient can download later.
