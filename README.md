@@ -1,6 +1,6 @@
-# Discordesque
+# Mirlume (formerly Discordesque)
 
-A private, Discord-inspired chat application for **Windows, Android and iOS**. One responsive React/Vite frontend; **Electron** wraps the Windows desktop application and **Capacitor** wraps the Android/iOS applications. **Supabase Auth + Postgres + Realtime** supply a shared backend.
+An independently branded, private cross-platform chat application for **Windows, Android and iOS**. One responsive React/Vite frontend; **Electron** wraps the Windows desktop application and **Capacitor** wraps the Android/iOS applications. **Supabase Auth + Postgres + Realtime** supply a shared backend.
 
 ## What works in v0.1 source
 
@@ -29,6 +29,28 @@ For simplest registration testing, in Supabase **Authentication → Providers �
 Both `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` must exist as **repository variables before a build runs**. If you just saved the variables, start a new build rather than downloading an older artifact. Open [GitHub Actions](https://github.com/DakotaPlayz/Discordesque/actions) and choose **Build Windows** or **Build Android** → **Run workflow** → **Run workflow**. Builds also start automatically when a change is pushed to `main`.
 
 In each completed run, open **Artifacts** to download the Windows EXE package or Android debug APK. Check the logs if a workflow is red; an artifact should not be assumed until GitHub reports that it built successfully.
+
+## v0.3: new identity, DMs, and interface
+
+**User-facing name:** Mirlume. This name is a working brand candidate, *not* a registered or trademark-cleared mark. Before distributing publicly or commercially, check the USPTO trademark search and relevant app-store/domain listings, or ask a trademark attorney to check it. The GitHub repository remains \`DakotaPlayz/Discordesque\` for now to preserve existing Supabase email-confirmation URLs and old source links. The app's Windows product title, icon, window text, browser title, Android/iOS display name, and package identifiers have changed.
+
+**A new Android application ID (\`io.mirlume.chat\`) means v0.3 installs separately from v0.2.** You can uninstall the old Android app after verifying the new one. This does **not** erase your shared Supabase account, servers or messages, but any unsent drafts or device-only data in the old app will not transfer. On Windows v0.3 has a new program name as well.
+
+### Enable private messages (one-time database update)
+
+1. Open your **existing** Supabase project's SQL Editor.
+2. Run the complete file **[supabase/direct-messages.sql](supabase/direct-messages.sql)** once.
+3. Install the v0.3 Android APK or Windows EXE, or launch the latest website build.
+4. Click the Mirlume logo at the top of the server rail to open **Direct Messages**. Click **New message**, choose someone from a server you both belong to, and start chatting.
+
+Direct messages are stored in Supabase and synchronized across devices. Only conversation participants may read or write the messages (Postgres RLS). New DMs require a shared server membership; existing conversations remain accessible after a user leaves a server. This is transport-encrypted but **not end-to-end encrypted**: the Supabase database administrators can access message content. Currently DMs are text-only; large file transfers remain available in server channels.
+
+### Visual and usability changes
+
+- New original mark and dark slate/mint identity, redesigned desktop and mobile styles, refined server rail and channel/sidebar hierarchy
+- Dedicated messages list, new-conversation picker, friend search, and realtime one-to-one text chat
+- **Profile editing bug fixed:** typing a display name no longer causes the dialog to steal keyboard focus after each keystroke
+- Retains private servers, channels, live chat, invites and experimental peer-to-peer attachments
 
 ## Free verification website (GitHub Pages)
 
