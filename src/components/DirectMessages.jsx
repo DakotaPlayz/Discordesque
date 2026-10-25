@@ -144,7 +144,7 @@ export default function DirectMessages({ session, servers, displayName, profile,
   }),[threads,preferences]);
   const active = useMemo(() => threads.find(t => t.id === activeId) || null, [threads, activeId]);
   const activePerson = active && contact(active);
-  const peerName = activePerson ? (nameMap[activePerson] || 'Member') : '';
+  const peerName = activePerson ? (preferences[activeId]?.nickname || nameMap[activePerson] || 'Member') : '';
 
   const refreshThreads = useCallback(async (selected) => {
     const { data, error: dbError } = await supabase.from('direct_conversations')
