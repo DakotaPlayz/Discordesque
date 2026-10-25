@@ -218,11 +218,31 @@ function ChatApp({ session }) {
     const confirmation=window.prompt('Permanently delete "'+item.name+'" and all its channels and messages for everyone?\n\nType the server name exactly to confirm:');
     if(confirmation===null)return;
     if(confirmation!==item.name){setError('Deletion canceled: server name did not match.');return;}
-    const {error:e}=await supabase.rpc('mirlume_delete_server',{p_server:item.id});
-    if(e){setError('Could not delete server: '+e.message);return;}
-    setServerContext(null);
-    await refreshServers();
-    await loadServerPreferences();
+    setError('');
+    try {
+      const {data, error:e}=await supabase.rpc('mirlume_delete_server',{p_server:item.id});
+      if(e){
+        const missing=/mirlume_delete_server|PGRST202|does not exist|schema cache/i.test(e.message||'');
+        setError(missing
+          ? 'Server deletion is not set up in Supabase yet. Run supabase/delete-server-v0.5.3.sql in the Supabase SQL Editor, then try again. ('+e.message+')'
+          : 'Could not delete server: '+e.message);
+        return;
+      }
+      if(data!==true){
+        setError('Server deletion was not confirmed by the database. Please try again.');
+        return;
+      }
+      // Check the server is actually gone instead of treating a successful RPC as a UI-only removal.
+      const {data:remaining,error:checkError}=await supabase.from('servers')
+        .select('id').eq('id',item.id).maybeSingle();
+      if(checkError){setError('Deletion requested but verification failed: '+checkError.message);return;}
+      if(remaining){setError('The server still exists in the database. Deletion was not completed.');return;}
+      setServerContext(null);
+      await refreshServers();
+      await loadServerPreferences();
+    } catch(err) {
+      setError('Could not delete server: '+(err?.message||String(err)));
+    }
   }
 
   const sortedServers=useMemo(()=>[...servers].sort((a,b)=>{
