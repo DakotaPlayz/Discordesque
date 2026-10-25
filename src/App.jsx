@@ -4,6 +4,7 @@ import {
   Plus, Send, Settings2, ShieldCheck, Sparkles, UsersRound, X,
 } from 'lucide-react';
 import { configured, confirmationUrl, supabase } from './lib/supabase.js';
+import FileTransfers from './components/FileTransfers.jsx';
 
 function initials(name) {
   return (name || '?').slice(0, 2).toUpperCase();
@@ -423,7 +424,7 @@ function ChatApp({ session }) {
           )}
         </div>
         {error && <div className="error-banner" role="alert">{error}<button aria-label="Dismiss error" onClick={() => setError('')}><X size={16} /></button></div>}
-        {channel && <form className="composer-area" onSubmit={sendMessage}><div className="composer"><textarea value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={2000} rows={1} placeholder={'Message #' + channel.name} aria-label="Message" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); sendMessage(); } }} /><button type="submit" className="send-button" aria-label="Send message" disabled={!draft.trim() || pending}><Send size={19} /></button></div><p className="composer-tip">Enter to send · Shift+Enter for a new line</p></form>}
+        {channel && <form className="composer-area" onSubmit={sendMessage}><div className="composer"><FileTransfers session={session} server={server} channel={channel} /><textarea value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={2000} rows={1} placeholder={'Message #' + channel.name} aria-label="Message" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); sendMessage(); } }} /><button type="submit" className="send-button" aria-label="Send message" disabled={!draft.trim() || pending}><Send size={19} /></button></div><p className="composer-tip">Enter to send · Shift+Enter for a new line</p></form>}
       </main>
 
       {modal && <Dialog title={dialogTitle[modal]} onClose={() => setModal('')}>
