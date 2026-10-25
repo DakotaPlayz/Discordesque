@@ -1,4 +1,4 @@
-name: Build Android
+name: Build Mirlume Android
 
 on:
   push:
@@ -38,6 +38,6 @@ jobs:
           ./gradlew assembleDebug --no-daemon
       - uses: actions/upload-artifact@v4
         with:
-          name: Discordesque-Android-Debug
+          name: Mirlume-Android-Debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

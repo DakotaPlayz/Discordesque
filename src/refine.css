@@ -1,0 +1,73 @@
+/* Mirlume 0.4 — quieter, original product identity and attachment surfaces. */
+:root { --ml-mist:#b3f5df; --ml-control:#314756; --ml-focus:#70ddbd; }
+.app-shell { background:#101923; }
+.server-rail { background:linear-gradient(180deg,#111a23,#111820); border-right:1px solid #2b424a; }
+.server-bubble { box-shadow:none; }
+.rail-home .brand-icon { outline:1px solid #acd8c241; outline-offset:3px; }
+.channel-sidebar { background:linear-gradient(165deg,#1a2933,#18232f); }
+.server-header { background:#1b2a35a8; }
+.workspace-eyebrow { font-size:10px; font-weight:850; letter-spacing:1.8px; }
+.server-header strong { font-family:'Space Grotesk',sans-serif; letter-spacing:-.3px; }
+.chat { background:radial-gradient(ellipse at 98% 1%,#3859531c,transparent 38%),#202b38; }
+.chat-header { background:#202b37e8; backdrop-filter:blur(9px); }
+.channel-item.selected { box-shadow:inset 3px 0 #71d7bb; }
+.dm-thread.selected { box-shadow:inset 3px 0 #8adaae; }
+.message-scroll { scroll-behavior:smooth; }
+.message-inner { max-width:1300px; margin:auto; }
+.message-body { letter-spacing:.05px; }
+.message-meta strong { color:#b3e7d5; }
+.avatar { border-radius:13px; box-shadow:0 3px 13px #0002; }
+.splash-card,.auth-card { backdrop-filter:blur(12px); }
+.empty-chat .primary-button,.auth-card .primary-button { border-radius:9px; }
+.file-share-button { width:36px; height:36px; color:#abd9ce; display:grid; place-items:center; border-radius:10px; border:1px solid transparent; }
+.file-share-button:hover { background:#4d826c38; color:#bdffe8; border-color:#6a9a8169; }
+.file-share-button:disabled { opacity:.55; }
+.channel-attachments { margin:20px 0 12px; border:1px solid #40545c; border-radius:14px; overflow:hidden; background:linear-gradient(115deg,#293c45,#263844); box-shadow:0 8px 23px #0b152528; }
+.attachment-heading { display:flex; align-items:center; gap:10px; min-height:46px; padding:13px 17px; border-bottom:1px solid #3d525a; background:#324d513d; }
+.attachment-heading svg { color:#8de9c8; }
+.attachment-heading strong { color:#e2f8f0; font-size:13px; }
+.attachment-heading span { color:#91aeb3; font-size:11px; margin-left:auto; }
+.attachment-entry { display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid #354750; }
+.attachment-entry:last-child { border-bottom:none; }
+.attachment-entry:hover { background:#ffffff07; }
+.attachment-file-icon { display:grid; place-items:center; flex:0 0 42px; width:42px; height:42px; border-radius:11px; color:#8ddbc8; background:#3b645c65; border:1px solid #4a8b785e; }
+.attachment-information { flex:1; min-width:0; display:flex; flex-direction:column; gap:5px; }
+.attachment-information strong { font-size:13px; color:#f1f8f5; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.attachment-information span { color:#9fb7c1; font-size:11px; }
+.attachment-download { border:1px solid #456e66; color:#b5f3de; background:#31534c; width:37px; height:37px; border-radius:10px; display:grid; place-items:center; }
+.attachment-download:hover { background:#4a7d70; border-color:#89d8bf; color:white; }
+.attachment-download:disabled { opacity:.55; }
+.channel-upload { flex:0 0 auto; align-self:center; position:relative; }
+.visually-hidden { position:absolute!important; width:1px!important; height:1px!important; padding:0!important; margin:-1px!important; overflow:hidden!important; clip:rect(0,0,0,0)!important; white-space:nowrap!important; border:0!important; }
+.upload-popover { position:absolute; bottom:52px; left:-9px; width:min(350px,calc(100vw - 80px)); padding:15px 16px; z-index:25; background:#1c2d37; border:1px solid #547d73; border-radius:12px; box-shadow:0 24px 56px #060f1cc9; color:#e8f7f1; }
+.upload-state-line { display:flex; align-items:center; gap:9px; font-size:12px; line-height:1.5; }
+.upload-state-line span { flex:1; overflow-wrap:anywhere; }
+.upload-state-line strong { color:#98ebd4; }
+.upload-meter { height:6px; background:#3d5663; border-radius:99px; overflow:hidden; margin-top:10px; }
+.upload-meter>div { height:100%; background:#7fdac2; border-radius:99px; transition:width .18s ease; }
+.upload-success { display:flex; align-items:center; gap:7px; font-size:11px; color:#9cebc8; margin-bottom:0; }
+.upload-popover .file-error { margin-bottom:0; }
+.spinning { animation:mlspin 1.2s linear infinite; }
+@keyframes mlspin { to { transform:rotate(360deg); } }
+.files-widget .file-popover { background:#1d303a; border-color:#56867a; }
+.file-popover-title strong { color:#ebfff7; }
+.file-popover label { color:#a9e6d1; }
+.file-popover select,.file-popover input[type=file] { background:#29404a; border-color:#4a6672; }
+.file-popover input::file-selector-button { background:#4d9f87; color:#10382f; font-weight:700; }
+.file-offer { background:#2b414b; }
+.file-offer-actions button:first-child { background:#5eae95; border-color:#5eae95; color:#15372f; }
+.file-meter>div { background:#86dabc; }
+.dm-avatar { border-radius:13px; }
+.dm-chat .empty-chat-icon { border-radius:30px; }
+.confirm-card .brand-icon { border-radius:14px; }
+@media(max-width:700px) {
+  .message-inner { padding:0 13px 15px; }
+  .attachment-heading { flex-wrap:wrap; }
+  .attachment-heading span { width:100%; margin-left:28px; }
+  .attachment-entry { padding:12px 10px; gap:9px; }
+  .attachment-file-icon { flex-basis:37px; height:37px; width:37px; }
+  .channel-attachments { margin:14px 0; }
+  .upload-popover { position:fixed; left:10px; bottom:87px; width:calc(100vw - 20px); }
+  .file-popover { background:#1d303a; }
+}
+@media(prefers-reduced-motion:reduce) { .spinning { animation:none; } }

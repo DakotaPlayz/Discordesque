@@ -30,6 +30,32 @@ Both `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` must exist as **repository
 
 In each completed run, open **Artifacts** to download the Windows EXE package or Android debug APK. Check the logs if a workflow is red; an artifact should not be assumed until GitHub reports that it built successfully.
 
+## Mirlume v0.4 — two intentionally different kinds of attachments
+
+**Server channels: persistent files up to 50 MB (50,000,000 bytes)**
+
+- Click the paperclip-style upload icon beside a server channel's message field.
+- Files are stored in the existing Supabase project's private Storage bucket and appear as downloadable entries in that channel, including after the sender goes offline.
+- Uploads use TUS in 6 MiB chunks, with progress and retry handling. Access is enforced through Storage RLS and channel membership; files never receive permanent public URLs. Each download uses a 2-minute URL for signed-in authorized members.
+- The Supabase Free plan supports a maximum **50 MB per file**, but only **1 GB total file storage**, plus bandwidth limits. It is not unlimited hosting. Members should not upload copyrighted or unsafe files they lack permission to distribute.
+
+**Direct messages: peer-to-peer files up to 20 GiB (21,474,836,480 bytes)**
+
+- Open a DM and use the file-transfer paperclip. Choose a file and keep the app running. The recipient accepts and selects a save location; transfer bytes flow over a WebRTC data channel, not Supabase Storage.
+- Large incoming files are streamed to disk on **Windows**. Supported browsers with the File System Access save picker can also receive large files. Android/iOS receivers currently fall back to a **32 MiB** memory-backed limit until native disk writers are built. 20 GiB does **not** mean all device pairs are tested.
+- Transfers require both users online, and some NAT/firewall combinations require a TURN relay, which is **not configured by default**. Transfers are not resumable after disconnecting. The WebRTC connection encrypts transport, but file metadata (names and sizes) is stored in Supabase.
+- DM attachments are not stored in Supabase, so they cannot be downloaded later while the sender is offline.
+
+### Required one-time Supabase migration
+
+**Run `supabase/attachments-v0.4.sql` in the SQL Editor for your current project.** This requires the original `schema.sql`, `direct-messages.sql`, and `file-sharing.sql` migrations to be applied first. The v0.4 script creates the private channel-file bucket and policies, channel attachment metadata, and adds DM support to existing file-transfer signaling without deleting chat data. Run the new script once and verify it reports success. Do not re-run the earlier original migrations.
+
+If the migration is missing, uploads and DM file offers will fail with database/RLS errors. The Windows, Android and GitHub Pages site all use the same Supabase account and schema. No new app API keys are needed.
+
+### Product identity
+
+**Mirlume** has its own icon, teal/charcoal visual language, component layout and typography; no Discord logos, icons or product trade dress are included intentionally. However, appearance and working-name differences alone are *not* legal clearance. Before commercial or broad public distribution, check the United States Patent and Trademark Office trademark search and relevant international marks, store listings, and domains, or seek professional IP advice. The GitHub repository URL is unchanged to avoid breaking Supabase email-confirmation links and existing shared links.
+
 ## v0.3: new identity, DMs, and interface
 
 **User-facing name:** Mirlume. This name is a working brand candidate, *not* a registered or trademark-cleared mark. Before distributing publicly or commercially, check the USPTO trademark search and relevant app-store/domain listings, or ask a trademark attorney to check it. The GitHub repository remains `DakotaPlayz/Discordesque` for now to preserve existing Supabase email-confirmation URLs and old source links. The app's Windows product title, icon, window text, browser title, Android/iOS display name, and package identifiers have changed.
@@ -78,7 +104,7 @@ With **Confirm email** enabled, new users register on Windows, Android, iOS or t
 
 **Note:** Hosting GitHub Pages is free for this public repository. Supabase's own email sending limits still apply and may require custom SMTP as usage grows.
 
-## Peer-to-peer attachments (v0.2 experimental)
+## Historical v0.2 file transfer notes (superseded for server channels)
 
 **Do this before testing:** in Supabase's SQL Editor, run the *new* file [supabase/file-sharing.sql](supabase/file-sharing.sql) **once**. Do not re-run the original schema. The SQL adds two private tables, member-only offer policies and WebRTC signal listeners. It stores transfer *metadata* only, never file contents.
 
