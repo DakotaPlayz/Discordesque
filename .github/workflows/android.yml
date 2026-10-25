@@ -29,6 +29,8 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
       - name: Generate native project
         run: npx cap add android
+      - name: Apply Mirlume launcher icon and splash assets
+        run: npm run assets:android
       - name: Build debug APK
         run: |
           chmod +x android/gradlew
