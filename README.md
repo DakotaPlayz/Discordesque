@@ -30,6 +30,21 @@ Both `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` must exist as **repository
 
 In each completed run, open **Artifacts** to download the Windows EXE package or Android debug APK. Check the logs if a workflow is red; an artifact should not be assumed until GitHub reports that it built successfully.
 
+## Optional 500 GB hosted DM attachments (self-hosted, not included cloud space)
+
+**For true offline delivery**, there is an independent authenticated [Mirlume Attachment Server](attachment-server/README.md). Unlike peer-to-peer transfers, file bytes are stored on the always-on attachment server so the sender can sign out or turn off their device, and the recipient can download later.
+
+**Capacity:** configure a physically available storage drive of 500 GB or more. The server enforces a 500,000,000,000-byte hard storage quota and a 20 GiB per-file limit. It expires complete uploads after **7 days** by default, removes abandoned incomplete uploads after 12 hours, and purges periodically.
+
+**Setup:** provide your existing Supabase project URL and public anon/publishable key to the server; run Node.js 22+ and place the service behind an HTTPS domain accessible to your friends. Set `VITE_ATTACHMENT_SERVER_URL` in [GitHub Actions repository variables](https://github.com/DakotaPlayz/Discordesque/settings/variables/actions) to that public HTTPS URL, then rebuild website, Windows, and Android. Without this variable the app continues using the older live-only peer-to-peer DM transfers, so this feature does NOT automatically activate just by merging code.
+
+**In DM:** the sender chooses a file and it uploads to the server. The file appears as a message attachment; the recipient clicks Download whenever they want, even if the sender is offline. No recipient chooser, acceptance request, or simultaneous online requirement. The storage computer must remain online and files disappear after the configured expiry.
+
+**Hosting reality:** no verified free managed developer-storage provider guarantees a permanent 500 GB allocation with our required access control. storage.to offers free temporary links up to 25 GB/file with 1–7-day expiration, but it does not guarantee a 500 GB pool and its terms restrict treating it as another app's media/storage backend. TeraBox advertises 1 TB but limits free uploads to 4 GB. The self-hosted server provides a no-subscription option **only if you already own sufficient disk space and internet connectivity**.
+
+**No additional Supabase SQL required for this hosted variant:** file metadata lives on your own server. This is distinct from the optional smaller [offline-dm-files.sql](supabase/offline-dm-files.sql) that uses Supabase Storage (subject to Supabase's 1 GB total free quota and 50 MB maximum file size).
+
+**Still experimental:** public HTTPS, rate limiting, disk failure recovery, malware scanning, mobile devices, and end-to-end 20 GB transfers require real-world security and load testing before public distribution.
 ## Mirlume v0.5 — rich profiles, original redesign and DM file downloads
 
 Mirlume now has a distinct aqua/graphite visual identity, private profile cards, personal banners and avatars, server icons and banners, and adaptable mobile layouts. An original UI is not legal trademark clearance.
