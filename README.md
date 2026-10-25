@@ -30,6 +30,35 @@ Both `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` must exist as **repository
 
 In each completed run, open **Artifacts** to download the Windows EXE package or Android debug APK. Check the logs if a workflow is red; an artifact should not be assumed until GitHub reports that it built successfully.
 
+## Mirlume v0.5 — rich profiles, original redesign and DM file downloads
+
+Mirlume now has a distinct aqua/graphite visual identity, private profile cards, personal banners and avatars, server icons and banners, and adaptable mobile layouts. An original UI is not legal trademark clearance.
+
+### One-time Supabase migrations — run in this order
+
+Apply these in your **existing project**, after the original schema, direct-messages.sql, file-sharing.sql and attachments-v0.4.sql:
+
+1. [supabase/auto-dm-delivery.sql](supabase/auto-dm-delivery.sql) — creates one-time file download claims and completion tracking.
+2. [supabase/profiles-v0.5.sql](supabase/profiles-v0.5.sql) — adds user bios, profile photos, banners, statuses, pronouns and colors, per-server member profiles, server logos and banners, and two private image buckets.
+
+Open the account gear to edit identity; server owners manage their server's branding from the same interface. Avatars/icons are limited to 5 MB and banners to 10 MB. Images require signed URLs. Supabase Free storage quotas still apply.
+
+### DM attachments: click Download, no recipient picker
+
+- Choose a DM, click its paperclip and select a file. A file card appears automatically in that conversation: you never need to select the recipient again.
+- The other person clicks **Download** on the file card. There is **no separate Accept request**, and files never silently save without a click.
+- File bytes stream directly over WebRTC, not through Supabase Storage. Both participants must stay online in that DM during a transfer. Some networks require a TURN relay, which is not set up yet. No resumable P2P downloads or offline large files.
+- Windows streams into Downloads/Mirlume with a temporary .part file; Android 10+ uses MediaStore Downloads/Mirlume; iOS uses its Files-app-accessible Mirlume documents folder only after the native plugin is compiled in Xcode. Downloads are never loaded fully into app RAM.
+- Browsers without a streaming file-save picker have a 32 MiB fallback. Test small transfers before trying 20 GiB. No antivirus scanning or cryptographic file checksums are implemented.
+
+### Mobile native code
+
+**Android:** run npm run native:android after installing dependencies. The GitHub Android build includes the native Capacitor writer automatically.
+
+**iOS:** On a Mac, run npx cap add ios if needed, then npm run native:ios. In Xcode, add both copied Swift files from ios/App/App into the App target (the installer copies the files but Xcode must compile them). Make the generated Main.storyboard's view controller class MirlumeViewController and set Boolean YES in Info.plist for UIFileSharingEnabled and LSSupportsOpeningDocumentsInPlace. Sign with Apple developer credentials. iOS streaming has **not been compiled or tested** in this environment.
+
+Server file attachments remain capped at **50 MB per file** and are stored privately in Supabase. Direct-message files remain limited to **20 GiB per live peer-to-peer transfer**.
+
 ## Mirlume v0.4 — two intentionally different kinds of attachments
 
 **Server channels: persistent files up to 50 MB (50,000,000 bytes)**
