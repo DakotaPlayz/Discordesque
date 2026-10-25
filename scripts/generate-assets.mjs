@@ -13,3 +13,25 @@ const splashBg={create:{width:2732,height:2732,channels:4,background:'#10262e'}}
 await sharp(splashBg).composite([{input:splashLogo,left:976,top:976}]).png().toFile('assets/splash.png');
 await sharp(splashBg).composite([{input:splashLogo,left:976,top:976}]).png().toFile('assets/splash-dark.png');
 console.log('Mirlume icon and splash images generated.');
+
+// Windows ICO package: native icon sizes stored as embedded PNGs.
+// Electron Builder reads this generated ICO as its installer/taskbar icon.
+const icoSizes = [16, 32, 48, 64, 128, 256];
+const pngs = await Promise.all(icoSizes.map(size => sharp(svg).resize(size,size).png().toBuffer()));
+const icoHeader = Buffer.alloc(6);
+icoHeader.writeUInt16LE(1, 2); // icon
+icoHeader.writeUInt16LE(pngs.length, 4);
+let offset = 6 + pngs.length * 16;
+const icoEntries = pngs.map((png, i) => {
+  const entry = Buffer.alloc(16);
+  entry.writeUInt8(icoSizes[i] === 256 ? 0 : icoSizes[i], 0);
+  entry.writeUInt8(icoSizes[i] === 256 ? 0 : icoSizes[i], 1);
+  entry.writeUInt16LE(1, 4);
+  entry.writeUInt16LE(32, 6);
+  entry.writeUInt32LE(png.length, 8);
+  entry.writeUInt32LE(offset, 12);
+  offset += png.length;
+  return entry;
+});
+await fs.writeFile('build/icon.ico', Buffer.concat([icoHeader, ...icoEntries, ...pngs]));
+console.log('Windows installer icon generated.');
