@@ -32,9 +32,9 @@ In each completed run, open **Artifacts** to download the Windows EXE package or
 
 ## v0.3: new identity, DMs, and interface
 
-**User-facing name:** Mirlume. This name is a working brand candidate, *not* a registered or trademark-cleared mark. Before distributing publicly or commercially, check the USPTO trademark search and relevant app-store/domain listings, or ask a trademark attorney to check it. The GitHub repository remains \`DakotaPlayz/Discordesque\` for now to preserve existing Supabase email-confirmation URLs and old source links. The app's Windows product title, icon, window text, browser title, Android/iOS display name, and package identifiers have changed.
+**User-facing name:** Mirlume. This name is a working brand candidate, *not* a registered or trademark-cleared mark. Before distributing publicly or commercially, check the USPTO trademark search and relevant app-store/domain listings, or ask a trademark attorney to check it. The GitHub repository remains `DakotaPlayz/Discordesque` for now to preserve existing Supabase email-confirmation URLs and old source links. The app's Windows product title, icon, window text, browser title, Android/iOS display name, and package identifiers have changed.
 
-**A new Android application ID (\`io.mirlume.chat\`) means v0.3 installs separately from v0.2.** You can uninstall the old Android app after verifying the new one. This does **not** erase your shared Supabase account, servers or messages, but any unsent drafts or device-only data in the old app will not transfer. On Windows v0.3 has a new program name as well.
+**A new Android application ID (`io.mirlume.chat`) means v0.3 installs separately from v0.2.** You can uninstall the old Android app after verifying the new one. This does **not** erase your shared Supabase account, servers or messages, but any unsent drafts or device-only data in the old app will not transfer. On Windows v0.3 has a new program name as well.
 
 ### Enable private messages (one-time database update)
 
