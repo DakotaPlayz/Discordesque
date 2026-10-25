@@ -167,6 +167,8 @@ function ChatApp({ session }) {
   const [servers, setServers] = useState([]);
   const [serverPrefs,setServerPrefs] = useState({});
   const [serverContext,setServerContext] = useState(null);
+  const [memberContext,setMemberContext] = useState(null);
+  const [dmTarget,setDmTarget] = useState(null);
   const [channels, setChannels] = useState([]);
   const [activeServerId, setActiveServerId] = useState(null);
   const [activeChannelId, setActiveChannelId] = useState(null);
@@ -360,6 +362,27 @@ function ChatApp({ session }) {
 
   useEffect(()=>{refreshMemberProfiles();},[refreshMemberProfiles]);
 
+  const openMemberMenu=(event,id,name)=>{
+    event.preventDefault();
+    setMemberContext({x:event.clientX,y:event.clientY,id,title:name});
+  };
+  const messageMember=(id)=>{setDmTarget({id,request:Date.now()});setDmMode(true);setMobileSidebar(false);};
+  const menuForMember=({id})=>id===session.user.id
+    ? [{label:'View Profile',icon:UserRound,onClick:()=>openPeek(id)}]
+    : [
+      {label:'Profile',icon:UserRound,onClick:()=>openPeek(id)},
+      {label:'Message',icon:MessageCircle,onClick:()=>messageMember(id)},
+      {divider:true},
+      {label:'Add Friend',icon:UsersRound,onClick:async()=>{
+        const {data,error:e}=await supabase.rpc('mirlume_friend_action',{p_peer:id,p_action:'request'});
+        if(e)setError('Friend request failed: '+e.message);
+        else if(data==='already_friends')setError('You are already friends.');
+        else if(data==='already_requested')setError('Friend request already pending.');
+        else if(data==='accepted')setError('Friend request accepted!');
+        else setError('Friend request sent!');
+      }}
+    ];
+
   const openPeek=async(id)=>{
     const {data,error:e}=await supabase.from('profiles').select('*').eq('id',id).single();
     if(e){setError(e.message);return;}
@@ -516,9 +539,10 @@ function ChatApp({ session }) {
         <button className="server-bubble join-server" title="Join a space" aria-label="Join a space" onClick={() => openDialog('join')}><ArrowRight size={21} /></button>
       </nav>
       {serverContext&&<ContextMenu menu={serverContext} onClose={closeServerContext} items={menuForServer(serverContext.item)}/>}
+      {memberContext&&<ContextMenu menu={memberContext} onClose={()=>setMemberContext(null)} items={menuForMember(memberContext)}/>}
       {dmMode ? <DirectMessages session={session} servers={servers} displayName={currentName}
         openProfile={() => openDialog('identity')} profile={profile} sidebarOpen={mobileSidebar}
-        setSidebarOpen={setMobileSidebar}/> : <>
+        setSidebarOpen={setMobileSidebar} targetPeer={dmTarget}/> : <>
       <aside className="channel-sidebar">
         <div className="server-header"><div className="server-heading-text"><strong>{server?.name || 'Your spaces'}</strong>{server?.description&&<small>{server.description}</small>}</div><button className="icon-button" title="Server invitation" aria-label="Server invitation" onClick={() => openDialog(server ? 'invite' : 'join')}><UsersRound size={19} /></button></div>
         {server ? (
@@ -574,8 +598,8 @@ function ChatApp({ session }) {
                     {dayChanged && <div className="day-marker"><span>{formatDay(message.created_at)}</span></div>}
                     <article className={'message' + (compact ? ' compact' : '')}>
                       {compact ? <span className="compact-time">{timeOf(message.created_at)}</span> :
-                        <button type="button" className="message-profile-trigger" onClick={()=>openPeek(message.author_id)}><PersonAvatar name={who} path={avatarPath} color={message.profiles?.accent_color} own={message.author_id===session.user.id}/></button>}
-                      <div className="message-content">{!compact && <div className="message-meta"><button type="button" className="message-user-link" onClick={()=>openPeek(message.author_id)}>{who}</button><time>{timeOf(message.created_at)}</time></div>}<div className="message-body">{message.body}</div></div>
+                        <button type="button" className="message-profile-trigger" onContextMenu={e=>openMemberMenu(e,message.author_id,who)} onClick={()=>openPeek(message.author_id)}><PersonAvatar name={who} path={avatarPath} color={message.profiles?.accent_color} own={message.author_id===session.user.id}/></button>}
+                      <div className="message-content">{!compact && <div className="message-meta"><button type="button" className="message-user-link" onContextMenu={e=>openMemberMenu(e,message.author_id,who)} onClick={()=>openPeek(message.author_id)}>{who}</button><time>{timeOf(message.created_at)}</time></div>}<div className="message-body">{message.body}</div></div>
                     </article>
                   </div>
                 );
