@@ -12,7 +12,7 @@ crons = ["*/15 * * * *"]
 
 [vars]
 # Replace with the URL of the EXISTING Supabase project used by Mirlume.
-SUPABASE_URL = "https://YOUR_PROJECT.supabase.co"
+SUPABASE_URL = "https://jcmnzkbqfshxbwxcqni.supabase.co"
 MIRLUME_ALLOWED_ORIGINS = "https://dakotaplayz.github.io,http://localhost:5173,capacitor://localhost,http://localhost,null"
 
 # Set SUPABASE_ANON_KEY as a Wrangler secret; do not commit a service_role key.
