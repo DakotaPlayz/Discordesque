@@ -1,0 +1,8 @@
+{
+  "appId": "io.discordesque.app",
+  "appName": "Discordesque",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}
