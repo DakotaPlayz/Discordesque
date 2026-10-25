@@ -1,3 +1,4 @@
+import {execFileSync} from 'node:child_process';
 import {readFile,writeFile,copyFile,mkdir} from 'node:fs/promises';
 const folder='ios/App/App';
 await mkdir(folder,{recursive:true});
@@ -10,5 +11,13 @@ try {
     'customClass="MirlumeViewController" customModule="App"');
   await writeFile(storyboard,xml);
 } catch(err){console.warn('Could not set custom controller in storyboard:',err.message);}
-console.log('iOS writer files copied. Add both Swift files to App target in Xcode.');
-console.log('Set UIFileSharingEnabled and LSSupportsOpeningDocumentsInPlace to YES in Info.plist.');
+try {
+  execFileSync('ruby', ['scripts/link-ios-target.rb'], {stdio:'inherit'});
+} catch(err) {
+  console.warn('Install the Ruby xcodeproj gem and re-run native:ios to link the Swift files:',err.message);
+}
+for (const key of ['UIFileSharingEnabled','LSSupportsOpeningDocumentsInPlace']) {
+  try {execFileSync('/usr/libexec/PlistBuddy',['-c','Add :'+key+' bool YES','ios/App/App/Info.plist']);}
+  catch {execFileSync('/usr/libexec/PlistBuddy',['-c','Set :'+key+' YES','ios/App/App/Info.plist']);}
+}
+console.log('Mirlume native iOS files configured for Files app access.');
