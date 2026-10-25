@@ -1,6 +1,6 @@
 {
-  "name": "discordesque",
-  "version": "0.2.0",
+  "name": "mirlume",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
@@ -30,8 +30,8 @@
     "vite": "^7.1.5"
   },
   "build": {
-    "appId": "io.discordesque.app",
-    "productName": "Discordesque",
+    "appId": "io.mirlume.chat",
+    "productName": "Mirlume",
     "directories": {
       "output": "release"
     },
