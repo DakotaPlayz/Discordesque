@@ -1,7 +1,7 @@
--- Mirlume 0.4.1: automatic DM delivery without recipient approval.
+-- Mirlume 0.4.1: DM file cards with one-click downloading and transfer status.
 -- Run AFTER attachments-v0.4.sql in the existing Supabase project.
 -- The sender and receiver must be online for WebRTC transfers.
--- Claiming prevents repeated downloads when the DM is reopened.
+-- The recipient clicks Download; claiming prevents duplicate downloads.
 
 alter table public.file_transfers
   add column if not exists transfer_status text not null default 'waiting';
