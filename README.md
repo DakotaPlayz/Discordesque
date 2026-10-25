@@ -12,7 +12,7 @@ A private, Discord-inspired chat application for **Windows, Android and iOS**. O
 - Responsive Windows/tablet/phone interface
 - Windows portable EXE / installer and Android debug APK build workflows
 
-Not in v0.1: voice calls, screen share, push notifications, attachments, moderation, end-to-end encryption. Messages are encrypted in transit but **not end-to-end encrypted**; your Supabase database administrators can access stored messages.
+Not in v0.2: voice calls, screen share, push notifications, offline/cloud attachments, resumable transfers, moderation, end-to-end chat encryption. Messages are encrypted in transit but **not end-to-end encrypted**; your Supabase database administrators can access stored messages.
 
 ## Configure once
 
@@ -55,6 +55,26 @@ Save changes. The client sends new confirmation emails to that exact URL via `em
 With **Confirm email** enabled, new users register on Windows, Android, iOS or the web, click the verification email, see a success message in their browser, and then sign in normally in their original app. No native deep-link setup is needed. Existing emails already sent may use the old redirect URL and are not retroactively changed.
 
 **Note:** Hosting GitHub Pages is free for this public repository. Supabase's own email sending limits still apply and may require custom SMTP as usage grows.
+
+## Peer-to-peer attachments (v0.2 experimental)
+
+**Do this before testing:** in Supabase's SQL Editor, run the *new* file [supabase/file-sharing.sql](supabase/file-sharing.sql) **once**. Do not re-run the original schema. The SQL adds two private tables, member-only offer policies and WebRTC signal listeners. It stores transfer *metadata* only, never file contents.
+
+In the app, open a text channel and press the **paperclip** next to the message input. Choose a friend and select the file; your friend must stay in that channel, open the paperclip panel and press **Accept**. The receiver selects a save location, then the sender streams directly to them while both remain connected. You can monitor progress and cancel the transfer.
+
+| Capability | Initial v0.2 support |
+| --- | --- |
+| Windows EXE → Windows EXE | **Up to 20 GiB**, streamed directly to disk via the Electron bridge |
+| Browser with a compatible streaming file-save picker | **Up to 20 GiB**; feature-detected |
+| Android / iOS native receiver | **Up to 32 MiB fallback only**, until native file streaming is implemented |
+| Android / iOS sender | Can select a file up to 20 GiB when device picker supports it and sender remains foregrounded; large mobile transfers are **not yet certified** |
+| Stored offline attachments | Not supported; sender must remain online |
+| Automatic resume after disconnect | Not supported (start again) |
+| Connectivity | Uses a free STUN server; some NAT/firewalls require paid/self-hosted TURN, so **not all connections work** |
+
+For security, RLS checks both participants against server membership; offers and signaling are visible only to the sender and receiver. WebRTC DataChannels provide transport encryption. File names and transfer sizes are stored in Supabase for signaling. Receivers must explicitly accept and choose a destination. The application cannot scan shared files for malware; only accept files from people you trust.
+
+This is an **experimental** file-sharing release: validate with a small test file first, then gradually try larger ones, and ensure the recipient has enough free space. Do **not** rely on it yet for critical files without checking the results.
 
 ## Local development (Node.js 22+)
 
