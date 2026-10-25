@@ -29,7 +29,7 @@ async function request(url,options={}){
   }
   if(!result.ok){
     const json=await result.json().catch(()=>({}));
-    if(result.status===401)throw Error('File sharing could not verify your login. Sign out and back in; if it persists, the Cloudflare Supabase settings need checking.');
+    if(result.status===401)throw Error('DM file authentication failed: '+(json.error||'Supabase rejected the session')+'. Check that the Cloudflare Worker uses the same Supabase project as Mirlume.');
     throw Error(json.error||'Attachment server responded '+result.status);
   }
   return result;
