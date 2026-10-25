@@ -19,9 +19,9 @@ const json = (data, status = 200, headers = {}) =>
 async function authenticate(request, env) {
   const auth = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization')||'');
   if (!auth) throw error('Sign in required',401);
-  const projectUrl=String(env.SUPABASE_URL||'').trim().replace(/\\/$/,'');
+  const projectUrl=String(env.SUPABASE_URL||'').trim().replace(/\/$/,'');
   const apiKey=String(env.SUPABASE_ANON_KEY||env.SUPABASE_PUBLISHABLE_KEY||'').trim();
-  if(!/^https:\/\/[^/]+\\.supabase\\.co$/.test(projectUrl)||!apiKey)
+  if(!/^https:\/\/[^/]+\.supabase\.co$/.test(projectUrl)||!apiKey)
     throw error('Cloudflare Worker Supabase configuration is missing or invalid',503);
   let res;
   try {
