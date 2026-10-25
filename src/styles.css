@@ -160,3 +160,11 @@ a { color: #b5adff; }
   .splash-card { padding:25px; }
   .dialog-backdrop { padding:15px; }
 }
+
+/* Email confirmation landing: used on the free GitHub Pages website. */
+.confirm-card { text-align:left; }
+.confirm-card .brand { margin-bottom:35px; }
+.confirmation-emblem { width:82px; height:82px; border-radius:24px; background:#285744; color:#90ffd0; display:grid; place-items:center; margin-bottom:25px; box-shadow:0 12px 50px #32a67b25; }
+.confirmation-emblem.error-emblem { background:#55404a; color:#ffc0c8; }
+.confirm-card .primary-button { margin-top:25px; }
+.confirm-card .small-note { margin-top:20px; margin-bottom:0; }
