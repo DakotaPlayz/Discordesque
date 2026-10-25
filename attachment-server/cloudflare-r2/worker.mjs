@@ -19,10 +19,23 @@ const json = (data, status = 200, headers = {}) =>
 async function authenticate(request, env) {
   const auth = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization')||'');
   if (!auth) throw error('Sign in required',401);
-  const res = await fetch(env.SUPABASE_URL+'/auth/v1/user',{headers:{
-    apikey:env.SUPABASE_ANON_KEY,Authorization:'Bearer '+auth[1]
-  }});
-  if(!res.ok)throw error('Invalid or expired session',401);
+  const projectUrl=String(env.SUPABASE_URL||'').trim().replace(/\\/$/,'');
+  const apiKey=String(env.SUPABASE_ANON_KEY||env.SUPABASE_PUBLISHABLE_KEY||'').trim();
+  if(!/^https:\/\/[^/]+\\.supabase\\.co$/.test(projectUrl)||!apiKey)
+    throw error('Cloudflare Worker Supabase configuration is missing or invalid',503);
+  let res;
+  try {
+    res=await fetch(projectUrl+'/auth/v1/user',{headers:{
+      apikey:apiKey,Authorization:'Bearer '+auth[1]
+    }});
+  }catch{
+    throw error('Cloudflare could not reach the configured Supabase project',502);
+  }
+  if(!res.ok){
+    if(res.status===401)throw error('Supabase rejected the session. Check that the Worker and app use the same Supabase project.',401);
+    if(res.status===403)throw error('Supabase rejected the Worker API key. Check SUPABASE_ANON_KEY in Cloudflare.',503);
+    throw error('Supabase authentication check failed (HTTP '+res.status+'). Verify Cloudflare Supabase settings.',502);
+  }
   const user = await res.json();
   if(!user?.id)throw error('No active account',401);
   return {id:user.id,token:auth[1]};
