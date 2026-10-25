@@ -1,4 +1,4 @@
-name: Publish Discordesque Website
+name: Publish Mirlume Website
 
 on:
   push:
@@ -21,7 +21,7 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Check out Discordesque
+      - name: Check out Mirlume
         uses: actions/checkout@v4
       - name: Set up Node
         uses: actions/setup-node@v4
