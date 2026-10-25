@@ -215,7 +215,7 @@ function ChatApp({ session }) {
 
   async function deleteSpace(item){
     if(item.owner_id!==session.user.id){setError('Only the server owner can delete this server.');return;}
-    const confirmation=window.prompt('Permanently delete "'+item.name+'" and all its channels and messages for everyone?\\n\\nType the server name exactly to confirm:');
+    const confirmation=window.prompt('Permanently delete "'+item.name+'" and all its channels and messages for everyone?\n\nType the server name exactly to confirm:');
     if(confirmation===null)return;
     if(confirmation!==item.name){setError('Deletion canceled: server name did not match.');return;}
     const {error:e}=await supabase.rpc('mirlume_delete_server',{p_server:item.id});
