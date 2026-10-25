@@ -3,7 +3,7 @@ import {
   ArrowRight, Check, Copy, Hash, LockKeyhole, LogOut, Menu, MessageCircle,
   Plus, Send, Settings2, ShieldCheck, Sparkles, UsersRound, X,
 } from 'lucide-react';
-import { configured, supabase } from './lib/supabase.js';
+import { configured, confirmationUrl, supabase } from './lib/supabase.js';
 
 function initials(name) {
   return (name || '?').slice(0, 2).toUpperCase();
@@ -59,11 +59,11 @@ function AuthScreen() {
     setNotice('');
     try {
       const result = register
-        ? await supabase.auth.signUp({ email: email.trim(), password })
+        ? await supabase.auth.signUp({ email: email.trim(), password, options: { emailRedirectTo: confirmationUrl } })
         : await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (result.error) throw result.error;
       if (register && !result.data.session) {
-        setNotice('Account created! Check your email for a confirmation link, then sign in here.');
+        setNotice('Check your email and open the verification link. It leads to our free Discordesque website, then you can sign in here on any device.');
       } else if (register) {
         setNotice('Account created. Signing you in...');
       }
@@ -119,6 +119,36 @@ function Dialog({ title, children, onClose }) {
 
 function Avatar({ name, own = false }) {
   return <div className={'avatar' + (own ? ' own' : '')} aria-hidden="true">{initials(name)}</div>;
+}
+
+
+function ConfirmationScreen({ session, onContinue }) {
+  const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  const linkError = fragment.get('error_description') || fragment.get('error_code');
+  const success = Boolean(session);
+  return (
+    <div className="splash">
+      <div className="splash-card confirm-card">
+        <Brand />
+        <div className={'confirmation-emblem' + (success ? '' : ' error-emblem')}>
+          {success ? <Check size={41} strokeWidth={3} /> : <LockKeyhole size={37} />}
+        </div>
+        <div className="eyebrow">{success ? 'ACCOUNT VERIFIED' : 'CONFIRMATION LINK'}</div>
+        <h1>{success ? 'Email confirmed!' : 'Could not confirm your email'}</h1>
+        <p>{success
+          ? 'You are all set. Your email is verified, and your Discordesque account can now sign in across Windows, Android, iOS and the web.'
+          : linkError
+            ? 'That confirmation link may be invalid or expired. Return to Discordesque and try signing in, or request a new verification email.'
+            : 'We could not find an authenticated session from that link. Please check the newest confirmation email and try again.'}</p>
+        {success ? (
+          <>
+            <button className="primary-button wide" onClick={onContinue}>Continue to Discordesque <ArrowRight size={17}/></button>
+            <p className="small-note">Using the app on your phone or computer? Return to that app and sign in with the email and password you registered.</p>
+          </>
+        ) : <button className="primary-button wide" onClick={onContinue}>Go to sign in <ArrowRight size={17}/></button>}
+      </div>
+    </div>
+  );
 }
 
 function ChatApp({ session }) {
@@ -421,6 +451,9 @@ function ChatApp({ session }) {
 export default function App() {
   const [session, setSession] = useState(null);
   const [checking, setChecking] = useState(true);
+  const [showConfirmation, setShowConfirmation] = useState(
+    new URLSearchParams(window.location.search).has('confirmed')
+  );
 
   useEffect(() => {
     if (!supabase) { setChecking(false); return; }
@@ -436,5 +469,11 @@ export default function App() {
 
   if (!configured) return <SetupScreen />;
   if (checking) return <div className="loading-screen"><Brand /><p>Connecting to your space...</p></div>;
-  return session ? <ChatApp key={session.user.id} session={session} /> : <AuthScreen />;
+  if (showConfirmation) {
+    return <ConfirmationScreen session={session} onContinue={() => {
+      window.history.replaceState(null, '', window.location.pathname);
+      setShowConfirmation(false);
+    }} />;
+  }
+  return session ? <ChatApp key={session.user.id} session={session} /> : <AuthScreen />;;
 }
