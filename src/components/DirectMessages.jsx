@@ -4,6 +4,7 @@ import {
   Plus, Search, Send, Settings2, ShieldCheck, Users, X
 } from 'lucide-react';
 import { supabase } from '../lib/supabase.js';
+import FileTransfers from './FileTransfers.jsx';
 
 const formatTime = (date) => new Date(date).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 const formatDay = (date) => new Date(date).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
@@ -219,6 +220,7 @@ export default function DirectMessages({ session, servers, displayName, openProf
       {error && !picker && <div className="error-banner" role="alert">{error}<button type="button" aria-label="Dismiss error" onClick={() => setError('')}><X size={16}/></button></div>}
       {active && <form className="composer-area" onSubmit={send}>
         <div className="composer dm-composer">
+          <FileTransfers key={activeId} session={session} conversationId={activeId} peerId={activePerson} peerName={peerName}/>
           <textarea rows={1} maxLength={2000} placeholder={'Message @' + peerName} aria-label="Direct message"
             value={text} onChange={e => setText(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } }}/>
