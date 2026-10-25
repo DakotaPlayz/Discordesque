@@ -1,0 +1,28 @@
+name: Validate Mirlume Attachment Server
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'attachment-server/**'
+      - '.github/workflows/attachment-server.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'attachment-server/**'
+      - '.github/workflows/attachment-server.yml'
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate Node server syntax
+        run: node --check attachment-server/server.mjs
+      - name: Verify dependency manifest
+        working-directory: attachment-server
+        run: npm install --no-audit --no-fund
