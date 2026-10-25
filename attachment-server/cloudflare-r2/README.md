@@ -8,8 +8,8 @@ This is a **paid-after-free** service, not a promise of 500 GB for $0. R2 Standa
 
 1. Create a Cloudflare account; activate R2 and review its billing terms.
 2. Install Node.js 22 and run `npx wrangler login` on your own computer **for setup only**.
-3. From this directory, run `npx wrangler r2 bucket create mirlume-dm-files`.
-4. Edit `wrangler.toml`: replace `SUPABASE_URL` with your existing project's URL. Keep `MIRLUME_ALLOWED_ORIGINS` restricted to Mirlume's origins.
+3. Reuse your existing private R2 bucket named `mirlume` (you can confirm it with `npx wrangler r2 bucket list`). The checked-in `wrangler.toml` binds it as `FILES`; do not create a second bucket.
+4. Edit `wrangler.toml`: replace the placeholder `SUPABASE_URL` with your existing project's URL. Keep `MIRLUME_ALLOWED_ORIGINS` restricted to Mirlume's origins. The Worker uses a native R2 bucket binding, so it does **not** need your S3 Access Key ID, Secret Access Key, or Cloudflare API token in its source or GitHub settings.
 5. Run `npx wrangler secret put SUPABASE_ANON_KEY`, and paste your **public/publishable** Supabase key (never the service_role secret).
 6. Run `npx wrangler deploy`. Cloudflare will give you an HTTPS `*.workers.dev` endpoint.
 7. Add GitHub Actions variable `VITE_ATTACHMENT_SERVER_URL` with that exact HTTPS URL under [Actions Variables](https://github.com/DakotaPlayz/Discordesque/settings/variables/actions).

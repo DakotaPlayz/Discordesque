@@ -5,7 +5,7 @@ workers_dev = true
 
 [[r2_buckets]]
 binding = "FILES"
-bucket_name = "mirlume-dm-files"
+bucket_name = "mirlume"
 
 [triggers]
 crons = ["*/15 * * * *"]
