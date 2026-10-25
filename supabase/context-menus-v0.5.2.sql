@@ -33,6 +33,8 @@ create table if not exists public.mirlume_dm_preferences (
 );
 alter table public.mirlume_server_preferences enable row level security;
 alter table public.mirlume_dm_preferences enable row level security;
+-- Explicit PostgREST permissions for user-controlled preferences.
+grant select,insert,update on public.mirlume_server_preferences,public.mirlume_dm_preferences to authenticated;
 
 drop policy if exists "Owner views own server settings" on public.mirlume_server_preferences;
 create policy "Owner views own server settings" on public.mirlume_server_preferences
