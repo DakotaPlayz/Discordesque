@@ -27,6 +27,7 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          VITE_ATTACHMENT_SERVER_URL: ${{ vars.VITE_ATTACHMENT_SERVER_URL }}
       - name: Generate native project
         run: npx cap add android
       - name: Install Mirlume native Android streaming writer
