@@ -1,5 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
-<rect width="128" height="128" rx="32" fill="#655be8"/>
-<path d="M37 38h40a19 19 0 0 1 19 19v14a19 19 0 0 1-19 19H60L38 104V90a20 20 0 0 1-19-19V57a19 19 0 0 1 18-19z" fill="#fff"/>
-<circle cx="48" cy="65" r="6" fill="#655be8"/><circle cx="71" cy="65" r="6" fill="#655be8"/>
+<defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#3caa98"/><stop offset="1" stop-color="#8ae8ce"/></linearGradient></defs>
+<rect width="128" height="128" rx="30" fill="#10262e"/>
+<path d="M24 91V51c0-11 8-19 19-19 9 0 15 4 19 11 4-7 11-11 20-11 11 0 19 8 19 19v40H87V53c0-4-3-7-7-7-6 0-10 4-10 11v34H56V53c0-4-3-7-7-7-6 0-10 4-10 11v34H24z" fill="url(#g)"/>
+<circle cx="106" cy="94" r="8" fill="#a9efdc"/>
 </svg>
