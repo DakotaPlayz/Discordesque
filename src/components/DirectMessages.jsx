@@ -10,7 +10,7 @@ const HOSTED_FILES_ENABLED=Boolean(import.meta.env.VITE_ATTACHMENT_SERVER_URL?.t
 import {PersonAvatar,ProfilePeek} from './IdentityStudio.jsx';
 import ContextMenu from './ContextMenu.jsx';
 import {BellOff,Pin,Star,UserRound,StickyNote,UserRoundPen,EyeOff,AppWindow,KeyRound,
-  UsersRound,UserX,ShieldBan,CheckCheck,VolumeX,Archive,LockKeyhole} from 'lucide-react';
+  UsersRound,UserX,ShieldBan,VolumeX,Archive,LockKeyhole} from 'lucide-react';
 
 const formatTime = (date) => new Date(date).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 const formatDay = (date) => new Date(date).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
