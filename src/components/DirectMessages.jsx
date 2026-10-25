@@ -9,6 +9,7 @@ import HostedDmFiles from './HostedDmFiles.jsx';
 const HOSTED_FILES_ENABLED=Boolean(import.meta.env.VITE_ATTACHMENT_SERVER_URL?.trim());
 import {PersonAvatar,ProfilePeek} from './IdentityStudio.jsx';
 import ContextMenu from './ContextMenu.jsx';
+import FriendsPanel from './FriendsPanel.jsx';
 import {BellOff,Pin,Star,UserRound,StickyNote,UserRoundPen,EyeOff,AppWindow,KeyRound,
   UsersRound,UserX,ShieldBan,VolumeX,Archive,LockKeyhole} from 'lucide-react';
 
@@ -37,6 +38,8 @@ export default function DirectMessages({ session, servers, displayName, profile,
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [picker, setPicker] = useState(false);
+  const [friendsView,setFriendsView] = useState(false);
+  const [friendIds,setFriendIds] = useState(new Set());
   const [peers, setPeers] = useState([]);
   const [search, setSearch] = useState('');
   const [pickerLoading, setPickerLoading] = useState(false);
@@ -88,6 +91,13 @@ export default function DirectMessages({ session, servers, displayName, profile,
     }
   }
 
+  async function reloadFriendIds(){
+    const {data}=await supabase.from('mirlume_friends').select('user_low,user_high,status')
+      .or('user_low.eq.'+uid+',user_high.eq.'+uid).eq('status','accepted');
+    if(data)setFriendIds(new Set(data.map(r=>r.user_low===uid?r.user_high:r.user_low)));
+  }
+  useEffect(()=>{reloadFriendIds();const timer=setInterval(reloadFriendIds,15000);return()=>clearInterval(timer);},[uid]);
+
   function menuForDm(thread){
     const pref=preferences[thread.id]||{};
     const person=contact(thread);
@@ -117,7 +127,10 @@ export default function DirectMessages({ session, servers, displayName, profile,
       {label:'Invite to Server',icon:UsersRound,submenu:servers.filter(x=>x.invite_code).map(item=>({
         label:item.name,onClick:()=>invitePeer(item,thread)
       }))},
-      {label:'Remove Friend',icon:UserX,disabled:true,description:'Friend requests are not yet implemented'},
+      {label:friendIds.has(person)?'Remove Friend':'Add Friend',icon:friendIds.has(person)?UserX:UsersRound,
+        onClick:async()=>{if(friendIds.has(person)&&!window.confirm('Remove '+display+' as a friend?'))return;
+          const {error:e}=await supabase.rpc('mirlume_friend_action',{p_peer:person,p_action:friendIds.has(person)?'remove':'request'});
+          if(e)setError(e.message);else await reloadFriendIds();}},
       {label:pref.ignored?'Stop Ignoring':'Ignore',icon:EyeOff,checked:Boolean(pref.ignored),
         onClick:()=>savePref(thread.id,{ignored:!pref.ignored,hidden:!pref.ignored})},
       {label:pref.blocked?'Unblock':'Block',icon:ShieldBan,danger:!pref.blocked,
@@ -204,17 +217,21 @@ export default function DirectMessages({ session, servers, displayName, profile,
   useEffect(() => { scrollEnd.current?.scrollIntoView({ block: 'end' }); }, [messages]);
 
   const openPicker = async () => {
+    setFriendsView(false);
     setPicker(true);
     setPickerLoading(true);
     setSearch('');
     setError('');
     try {
-      if (!servers.length) { setPeers([]); return; }
-      const { data: memberships, error: membershipError } = await supabase
-        .from('server_members').select('user_id')
-        .in('server_id', servers.map(s => s.id));
-      if (membershipError) throw membershipError;
-      const ids = [...new Set((memberships || []).map(m => m.user_id).filter(id => id !== uid))];
+      if (!servers.length && !friendIds.size) { setPeers([]); return; }
+      let memberships=[];
+      if(servers.length){
+        const {data,error:membershipError}=await supabase.from('server_members').select('user_id')
+          .in('server_id',servers.map(s=>s.id));
+        if(membershipError)throw membershipError;
+        memberships=data||[];
+      }
+      const ids=[...new Set([...memberships.map(m=>m.user_id),...friendIds].filter(id=>id!==uid))];
       if (!ids.length) { setPeers([]); return; }
       const { data: users, error: profilesError } = await supabase
         .from('profiles').select('id,display_name').in('id', ids).order('display_name');
@@ -233,6 +250,7 @@ export default function DirectMessages({ session, servers, displayName, profile,
       await savePref(data,{hidden:false,ignored:false});
       await refreshThreads(data);
       setPicker(false);
+      setFriendsView(false);
       setSidebarOpen(false);
     } catch (err) { setError(err.message || 'Unable to create conversation. Check that the DM migration is installed.'); }
     finally { setBusy(false); }
@@ -264,6 +282,7 @@ export default function DirectMessages({ session, servers, displayName, profile,
         <div><span className="workspace-eyebrow">PRIVATE MESSAGES</span><strong>Messages</strong></div>
         <button type="button" className="icon-button" onClick={openPicker} title="New direct message" aria-label="New direct message"><Edit3 size={19}/></button>
       </header>
+      <button type="button" className="dm-find-button" onClick={()=>{setFriendsView(true);setActiveId(null);setSidebarOpen(false);}}> <UsersRound size={17}/> Friends <Plus size={16}/></button>
       <button type="button" className="dm-find-button" onClick={openPicker}><Search size={17}/> Find a friend to message <Plus size={16}/></button>
       <div className="section-heading"><span>DIRECT MESSAGES</span><button type="button" className="icon-button" title="New message" onClick={openPicker}><Plus size={17}/></button></div>
       <div className="dm-thread-list">
@@ -275,7 +294,7 @@ export default function DirectMessages({ session, servers, displayName, profile,
               (preferences[thread.id]?.muted_until&&new Date(preferences[thread.id].muted_until)>new Date()?' is-muted':'')}
             type="button"
             onContextMenu={e=>{e.preventDefault();setDmContext({x:e.clientX,y:e.clientY,thread,title:name});}}
-            onClick={() => { setActiveId(thread.id); setSidebarOpen(false); }}>
+            onClick={() => { setFriendsView(false); setActiveId(thread.id); setSidebarOpen(false); }}>
             <InitialAvatar name={name} size="small" path={peerMap[id]?.avatar_path}/>
             <span className="dm-thread-text"><strong>{name}</strong><small>{preferences[thread.id]?.blocked?'Blocked':preferences[thread.id]?.pinned?'Pinned':preferences[thread.id]?.muted_until&&new Date(preferences[thread.id].muted_until)>new Date()?'Muted':'Direct message'}</small></span>
           </button>;
@@ -299,7 +318,7 @@ export default function DirectMessages({ session, servers, displayName, profile,
         <div className="chat-header-right"><ShieldCheck size={16}/> Private</div>
       </header>
       <div className="message-scroll">
-        {!active ? <div className="empty-chat dm-hero">
+        {friendsView ? <FriendsPanel session={session} onMessage={begin}/> : !active ? <div className="empty-chat dm-hero">
           <div className="empty-chat-icon"><MessageCircle size={40}/></div>
           <span className="workspace-eyebrow">STAY CONNECTED</span>
           <h1>Good conversations start here.</h1>
@@ -368,14 +387,14 @@ export default function DirectMessages({ session, servers, displayName, profile,
       <section className="dialog dm-picker" role="dialog" aria-modal="true" aria-label="New direct message">
         <header><h2>New message</h2><button type="button" className="icon-button" aria-label="Close" onClick={() => setPicker(false)}><X size={20}/></button></header>
         <div className="modal-content">
-          <p>Start a conversation with someone who shares a space with you.</p>
+          <p>Start a conversation with a friend or someone in a shared space.</p>
           <div className="dm-peer-search"><Search size={18}/><input autoFocus aria-label="Search people" placeholder="Search people" value={search} onChange={e => setSearch(e.target.value)}/></div>
           <div className="dm-peer-results">
             {pickerLoading && <p className="dm-picker-hint">Finding members…</p>}
             {!pickerLoading && filtered.map(peer => <button type="button" className="dm-peer" key={peer.id} disabled={busy} onClick={() => begin(peer.id)}>
               <InitialAvatar name={peer.display_name} size="small"/><strong>{peer.display_name}</strong><ArrowRight size={18}/>
             </button>)}
-            {!pickerLoading && filtered.length === 0 && <p className="dm-picker-hint">No members found. Invite someone to a shared space first.</p>}
+            {!pickerLoading && filtered.length === 0 && <p className="dm-picker-hint">No members found. Add a friend or invite someone to a shared space.</p>}
           </div>
           {error && <div className="inline-notice" role="alert">{error}</div>}
         </div>
