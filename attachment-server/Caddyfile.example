@@ -1,0 +1,8 @@
+# Requires a domain, correct DNS, and ports 80/443 forwarded to this host.
+# Replace files.example.com with your real domain. Do NOT serve over public HTTP.
+files.example.com {
+    reverse_proxy 127.0.0.1:8799
+    request_body {
+        max_size 9MB
+    }
+}

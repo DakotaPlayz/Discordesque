@@ -5,6 +5,8 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase.js';
 import FileTransfers from './FileTransfers.jsx';
+import HostedDmFiles from './HostedDmFiles.jsx';
+const HOSTED_FILES_ENABLED=Boolean(import.meta.env.VITE_ATTACHMENT_SERVER_URL?.trim());
 import {PersonAvatar,ProfilePeek} from './IdentityStudio.jsx';
 
 const formatTime = (date) => new Date(date).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
@@ -226,7 +228,7 @@ export default function DirectMessages({ session, servers, displayName, profile,
       {error && !picker && <div className="error-banner" role="alert">{error}<button type="button" aria-label="Dismiss error" onClick={() => setError('')}><X size={16}/></button></div>}
       {active && <form className="composer-area" onSubmit={send}>
         <div className="composer dm-composer">
-          <FileTransfers key={activeId} session={session} conversationId={activeId} peerId={activePerson} peerName={peerName}/>
+          {HOSTED_FILES_ENABLED ? <HostedDmFiles key={activeId} session={session} conversationId={activeId} peerName={peerName}/> : <FileTransfers key={activeId} session={session} conversationId={activeId} peerId={activePerson} peerName={peerName}/>}
           <textarea rows={1} maxLength={2000} placeholder={'Message @' + peerName} aria-label="Direct message"
             value={text} onChange={e => setText(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } }}/>

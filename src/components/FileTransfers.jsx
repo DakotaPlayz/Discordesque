@@ -20,7 +20,7 @@ function b64(buffer) {
   for (let i = 0; i < bytes.length; i++) chars += String.fromCharCode(bytes[i]);
   return btoa(chars);
 }
-async function getWriter(offer) {
+export async function getWriter(offer) {
   const filename = String(offer.filename).split(/[\\/]/).pop() || 'download.bin';
   if (window.discordesqueFiles?.start) {
     const result = await window.discordesqueFiles.start(filename, offer.size_bytes);
