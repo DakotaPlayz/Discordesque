@@ -1,6 +1,6 @@
 {
-  "appId": "io.discordesque.app",
-  "appName": "Discordesque",
+  "appId": "io.mirlume.chat",
+  "appName": "Mirlume",
   "webDir": "dist",
   "server": {
     "androidScheme": "https"

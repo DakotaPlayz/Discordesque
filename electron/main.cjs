@@ -14,8 +14,8 @@ function createWindow() {
     height: 760,
     minWidth: 370,
     minHeight: 580,
-    backgroundColor: '#171821',
-    title: 'Discordesque',
+    backgroundColor: '#131820',
+    title: 'Mirlume',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
@@ -45,7 +45,7 @@ ipcMain.handle('file:start', async (event, filename) => {
   if (event.sender !== currentWindow?.webContents) throw new Error('Unauthorized file writer.');
   const safeName = path.basename(String(filename).replace(/\\/g, '/')).slice(0, 255) || 'download.bin';
   const result = await dialog.showSaveDialog(currentWindow, {
-    title: 'Save incoming Discordesque file',
+    title: 'Save incoming Mirlume file',
     defaultPath: safeName,
     buttonLabel: 'Save',
   });

@@ -1,6 +1,6 @@
 {
-  "name": "discordesque",
-  "version": "0.2.0",
+  "name": "mirlume",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
@@ -11,7 +11,10 @@
     "desktop": "npm run build && electron .",
     "dist:win": "npm run build && electron-builder --win --publish never",
     "android:sync": "npm run build && cap sync android",
-    "ios:sync": "npm run build && cap sync ios"
+    "ios:sync": "npm run build && cap sync ios",
+    "assets:prepare": "node scripts/generate-assets.mjs",
+    "assets:android": "npm run assets:prepare && npx @capacitor/assets generate --android",
+    "assets:ios": "npm run assets:prepare && npx @capacitor/assets generate --ios"
   },
   "dependencies": {
     "@capacitor/core": "^7.4.0",
@@ -27,11 +30,13 @@
     "@vitejs/plugin-react": "^5.0.0",
     "electron": "^37.3.1",
     "electron-builder": "^26.0.12",
-    "vite": "^7.1.5"
+    "vite": "^7.1.5",
+    "@capacitor/assets": "^3.0.5",
+    "sharp": "^0.34.4"
   },
   "build": {
-    "appId": "io.discordesque.app",
-    "productName": "Discordesque",
+    "appId": "io.mirlume.chat",
+    "productName": "Mirlume",
     "directories": {
       "output": "release"
     },
