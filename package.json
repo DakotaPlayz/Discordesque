@@ -1,6 +1,6 @@
 {
   "name": "mirlume",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
@@ -9,7 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "desktop": "npm run build && electron .",
-    "dist:win": "npm run build && electron-builder --win --publish never",
+    "dist:win": "npm run assets:prepare && npm run build && electron-builder --win --publish never",
     "android:sync": "npm run build && cap sync android",
     "ios:sync": "npm run build && cap sync ios",
     "assets:prepare": "node scripts/generate-assets.mjs",
@@ -21,7 +21,8 @@
     "@supabase/supabase-js": "^2.57.0",
     "lucide-react": "^0.468.0",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react-dom": "^19.1.1",
+    "tus-js-client": "^4.3.1"
   },
   "devDependencies": {
     "@capacitor/android": "^7.4.0",
@@ -60,7 +61,8 @@
             "x64"
           ]
         }
-      ]
+      ],
+      "icon": "build/icon.ico"
     },
     "nsis": {
       "oneClick": false,
