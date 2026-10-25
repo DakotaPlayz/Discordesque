@@ -29,11 +29,8 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
       - name: Generate native project
         run: npx cap add android
-      - name: Install Mirlume native Android download writer
-        run: |
-          mkdir -p android/app/src/main/java/io/mirlume/chat
-          cp native/android/MirlumeFileWriter.java android/app/src/main/java/io/mirlume/chat/
-          cp native/android/MainActivity.java android/app/src/main/java/io/mirlume/chat/
+      - name: Install Mirlume native Android streaming writer
+        run: node scripts/install-android-writer.mjs
       - name: Apply Mirlume launcher icon and splash assets
         run: npm run assets:android
       - name: Build debug APK
