@@ -12,16 +12,24 @@ const MAX=20*1024**3;
 const CHUNK=8*1024**2;
 const pretty=n=>n>=1024**3?(n/1024**3).toFixed(2)+' GiB':n>=1024**2?(n/1024**2).toFixed(1)+' MiB':(n/1024).toFixed(1)+' KiB';
 
-async function token(){
-  const {data,error}=await supabase.auth.getSession();
-  if(error||!data?.session?.access_token)throw Error('Sign in to share files.');
+async function token(forceRefresh=false){
+  const {data,error}=forceRefresh
+    ? await supabase.auth.refreshSession()
+    : await supabase.auth.getSession();
+  if(error||!data?.session?.access_token)throw Error('Your login has expired. Sign out of Mirlume and sign back in.');
   return data.session.access_token;
 }
 async function request(url,options={}){
-  const bearer=await token();
-  const result=await fetch(base+url,{...options,headers:{Authorization:'Bearer '+bearer,...options.headers}});
+  let bearer=await token();
+  let result=await fetch(base+url,{...options,headers:{Authorization:'Bearer '+bearer,...options.headers}});
+  // A cached token may have expired. Refresh it once before showing an error.
+  if(result.status===401){
+    bearer=await token(true);
+    result=await fetch(base+url,{...options,headers:{Authorization:'Bearer '+bearer,...options.headers}});
+  }
   if(!result.ok){
     const json=await result.json().catch(()=>({}));
+    if(result.status===401)throw Error('File sharing could not verify your login. Sign out and back in; if it persists, the Cloudflare Supabase settings need checking.');
     throw Error(json.error||'Attachment server responded '+result.status);
   }
   return result;
