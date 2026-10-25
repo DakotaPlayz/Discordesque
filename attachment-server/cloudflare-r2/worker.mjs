@@ -83,6 +83,7 @@ async function initiate(request,env,user) {
     throw error('Files must be 1 byte to 20 GiB');
   await verifyConversation(env,conv,user);
   const all=await allRecords(env);
+  if(all.length>=40)throw error('Private beta attachment count full (40 files)',507);
   const reserved=all.filter(x=>x.expires_at>Date.now()).reduce((n,x)=>n+x.size_bytes,0);
   if(reserved+size>MAX_POOL)throw error('500 GB pool full',507);
   const id=crypto.randomUUID(),now=Date.now();
