@@ -8,6 +8,9 @@ import FileTransfers from './FileTransfers.jsx';
 import HostedDmFiles from './HostedDmFiles.jsx';
 const HOSTED_FILES_ENABLED=Boolean(import.meta.env.VITE_ATTACHMENT_SERVER_URL?.trim());
 import {PersonAvatar,ProfilePeek} from './IdentityStudio.jsx';
+import ContextMenu from './ContextMenu.jsx';
+import {BellOff,Pin,Star,UserRound,StickyNote,UserRoundPen,EyeOff,AppWindow,KeyRound,
+  UsersRound,UserX,ShieldBan,VolumeX,Archive,LockKeyhole} from 'lucide-react';
 
 const formatTime = (date) => new Date(date).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 const formatDay = (date) => new Date(date).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
@@ -20,6 +23,10 @@ function InitialAvatar({ name, own = false, size = 'normal', path }) {
 export default function DirectMessages({ session, servers, displayName, profile, openProfile, sidebarOpen, setSidebarOpen }) {
   const uid = session.user.id;
   const [threads, setThreads] = useState([]);
+  const [preferences,setPreferences] = useState({});
+  const [dmContext,setDmContext] = useState(null);
+  const [editor,setEditor] = useState(null);
+  const [editorValue,setEditorValue] = useState('');
   const [nameMap, setNameMap] = useState({});
   const [peerMap, setPeerMap] = useState({});
   const [peek,setPeek] = useState(null);
@@ -37,9 +44,107 @@ export default function DirectMessages({ session, servers, displayName, profile,
   const activeIdRef = useRef(null);
 
   const contact = useCallback(thread => thread.user_low === uid ? thread.user_high : thread.user_low, [uid]);
+  const closeDmContext=useCallback(()=>setDmContext(null),[]);
+
+  const refreshPrefs=useCallback(async()=>{
+    const {data,error:e}=await supabase.from('mirlume_dm_preferences').select('*').eq('user_id',uid);
+    if(e){console.warn('Install context-menus-v0.5.2.sql for DM settings:',e.message);return;}
+    setPreferences(Object.fromEntries((data||[]).map(p=>[p.conversation_id,p])));
+  },[uid]);
+  useEffect(()=>{refreshPrefs();},[refreshPrefs]);
+
+  async function savePref(conversationId,changes){
+    const original=preferences[conversationId]||{};
+    const updated={user_id:uid,conversation_id:conversationId,nickname:'',private_note:'',
+      pinned:false,favorite:false,hidden:false,ignored:false,blocked:false,...original,...changes,
+      updated_at:new Date().toISOString()};
+    setPreferences(prev=>({...prev,[conversationId]:updated}));
+    const {error:e}=await supabase.from('mirlume_dm_preferences').upsert(updated,{onConflict:'user_id,conversation_id'});
+    if(e){setPreferences(prev=>({...prev,[conversationId]:original}));setError('DM settings not saved: '+e.message);}
+  }
+
+  function openEditor(thread,kind){
+    setEditor({thread,kind});
+    setEditorValue(preferences[thread.id]?.[kind]||'');
+  }
+  async function saveEditor(event){
+    event.preventDefault();
+    if(!editor)return;
+    const limit=editor.kind==='nickname'?40:500;
+    await savePref(editor.thread.id,{[editor.kind]:editorValue.trim().slice(0,limit)});
+    setEditor(null);
+  }
+  async function invitePeer(server,thread){
+    setError('');
+    const {error:e}=await supabase.from('direct_messages').insert({
+      conversation_id:thread.id,author_id:uid,
+      body:'Join me in '+server.name+' on Mirlume! Invite code: '+server.invite_code
+    });
+    if(e)setError('Invitation not sent: '+e.message);
+    else if(activeId===thread.id){
+      const {data}=await supabase.from('direct_messages').select('*')
+        .eq('conversation_id',thread.id).order('created_at',{ascending:false}).limit(100);
+      if(data)setMessages(data.reverse());
+    }
+  }
+
+  function menuForDm(thread){
+    const pref=preferences[thread.id]||{};
+    const person=contact(thread);
+    const display=pref.nickname||nameMap[person]||'Member';
+    const muted=Boolean(pref.muted_until&&new Date(pref.muted_until)>new Date());
+    const mute=minutes=>savePref(thread.id,{muted_until:minutes?new Date(Date.now()+minutes*60000).toISOString():null});
+    return [
+      {label:'Mark as Read',icon:CheckCheck,onClick:()=>savePref(thread.id,{last_read_at:new Date().toISOString()})},
+      {divider:true},
+      {label:pref.pinned?'Unpin':'Pin',icon:Pin,checked:Boolean(pref.pinned),
+        onClick:()=>savePref(thread.id,{pinned:!pref.pinned})},
+      {label:pref.favorite?'Remove Favorite':'Add to Favorites',icon:Star,checked:Boolean(pref.favorite),
+        onClick:()=>savePref(thread.id,{favorite:!pref.favorite})},
+      {divider:true},
+      {label:'Profile',icon:UserRound,onClick:()=>setPeek(peerMap[person]||null)},
+      {label:'Add Note',icon:StickyNote,description:pref.private_note?'Edit your private note':'Visible only to you',
+        onClick:()=>openEditor(thread,'private_note')},
+      {label:'Add Friend Nickname',icon:UserRoundPen,onClick:()=>openEditor(thread,'nickname')},
+      {label:'Close DM',icon:Archive,onClick:()=>{
+        savePref(thread.id,{hidden:true});
+        if(activeId===thread.id)setActiveId(null);
+      }},
+      {divider:true},
+      {label:'Apps',icon:AppWindow,disabled:true,description:'App integrations are not supported yet'},
+      {label:'View Verification Code',icon:KeyRound,disabled:true,
+        description:'End-to-end encryption and safety codes are not implemented'},
+      {label:'Invite to Server',icon:UsersRound,submenu:servers.filter(x=>x.invite_code).map(item=>({
+        label:item.name,onClick:()=>invitePeer(item,thread)
+      }))},
+      {label:'Remove Friend',icon:UserX,disabled:true,description:'Friend requests are not yet implemented'},
+      {label:pref.ignored?'Stop Ignoring':'Ignore',icon:EyeOff,checked:Boolean(pref.ignored),
+        onClick:()=>savePref(thread.id,{ignored:!pref.ignored,hidden:!pref.ignored})},
+      {label:pref.blocked?'Unblock':'Block',icon:ShieldBan,danger:!pref.blocked,
+        checked:Boolean(pref.blocked),onClick:()=>{
+          if(!pref.blocked&&!window.confirm('Block '+display+'? Neither of you will be able to send messages in this conversation until you unblock.'))return;
+          savePref(thread.id,{blocked:!pref.blocked});
+        }},
+      {divider:true},
+      {label:muted?'Unmute '+display:'Mute '+display,icon:VolumeX,submenu:[
+        {label:'Unmute',onClick:()=>mute(null),disabled:!muted},
+        {label:'For 1 Hour',onClick:()=>mute(60)},
+        {label:'For 8 Hours',onClick:()=>mute(480)},
+        {label:'For 24 Hours',onClick:()=>mute(1440)},
+        {label:'Until I change it',onClick:()=>mute(60*24*365*10)}
+      ]}
+    ];
+  }
+
+  const visibleThreads=useMemo(()=>threads.filter(t=>!preferences[t.id]?.hidden).sort((a,b)=>{
+    const x=preferences[a.id]||{},y=preferences[b.id]||{};
+    return (Number(Boolean(y.pinned))-Number(Boolean(x.pinned)))||
+      (Number(Boolean(y.favorite))-Number(Boolean(x.favorite)))||
+      new Date(b.created_at)-new Date(a.created_at);
+  }),[threads,preferences]);
   const active = useMemo(() => threads.find(t => t.id === activeId) || null, [threads, activeId]);
   const activePerson = active && contact(active);
-  const peerName = activePerson ? (nameMap[activePerson] || 'Member') : '';
+  const peerName = activePerson ? (preferences[activeId]?.nickname || nameMap[activePerson] || 'Member') : '';
 
   const refreshThreads = useCallback(async (selected) => {
     const { data, error: dbError } = await supabase.from('direct_conversations')
@@ -125,6 +230,7 @@ export default function DirectMessages({ session, servers, displayName, profile,
     try {
       const { data, error: dbError } = await supabase.rpc('start_direct_message', { p_peer: otherId });
       if (dbError) throw dbError;
+      await savePref(data,{hidden:false,ignored:false});
       await refreshThreads(data);
       setPicker(false);
       setSidebarOpen(false);
@@ -161,16 +267,20 @@ export default function DirectMessages({ session, servers, displayName, profile,
       <button type="button" className="dm-find-button" onClick={openPicker}><Search size={17}/> Find a friend to message <Plus size={16}/></button>
       <div className="section-heading"><span>DIRECT MESSAGES</span><button type="button" className="icon-button" title="New message" onClick={openPicker}><Plus size={17}/></button></div>
       <div className="dm-thread-list">
-        {threads.map(thread => {
+        {visibleThreads.map(thread => {
           const id = contact(thread);
-          const name = nameMap[id] || 'Member';
-          return <button key={thread.id} className={'dm-thread' + (activeId === thread.id ? ' selected' : '')}
-            type="button" onClick={() => { setActiveId(thread.id); setSidebarOpen(false); }}>
+          const name = preferences[thread.id]?.nickname || nameMap[id] || 'Member';
+          return <button key={thread.id}
+            className={'dm-thread' + (activeId === thread.id ? ' selected' : '')+
+              (preferences[thread.id]?.muted_until&&new Date(preferences[thread.id].muted_until)>new Date()?' is-muted':'')}
+            type="button"
+            onContextMenu={e=>{e.preventDefault();setDmContext({x:e.clientX,y:e.clientY,thread,title:name});}}
+            onClick={() => { setActiveId(thread.id); setSidebarOpen(false); }}>
             <InitialAvatar name={name} size="small" path={peerMap[id]?.avatar_path}/>
-            <span className="dm-thread-text"><strong>{name}</strong><small>Direct message</small></span>
+            <span className="dm-thread-text"><strong>{name}</strong><small>{preferences[thread.id]?.blocked?'Blocked':preferences[thread.id]?.pinned?'Pinned':preferences[thread.id]?.muted_until&&new Date(preferences[thread.id].muted_until)>new Date()?'Muted':'Direct message'}</small></span>
           </button>;
         })}
-        {!threads.length && <div className="dm-no-threads"><MessageCircle size={27}/><strong>No messages yet</strong><span>Start a private conversation with someone in your spaces.</span><button type="button" className="mini-primary" onClick={openPicker}>New message</button></div>}
+        {!visibleThreads.length && <div className="dm-no-threads"><MessageCircle size={27}/><strong>No messages yet</strong><span>Start a private conversation with someone in your spaces.</span><button type="button" className="mini-primary" onClick={openPicker}>New message</button></div>}
       </div>
       <div className="sidebar-spacer"/>
       <div className="account-bar">
@@ -239,6 +349,21 @@ export default function DirectMessages({ session, servers, displayName, profile,
     </main>
 
     {peek && <ProfilePeek person={peek} onClose={()=>setPeek(null)}/>}
+    {dmContext&&<ContextMenu menu={dmContext} onClose={closeDmContext} items={menuForDm(dmContext.thread)}/>}
+    {editor && <div className="dialog-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setEditor(null);}}>
+      <section className="dialog dm-edit-panel" role="dialog" aria-modal="true">
+        <header><h2>{editor.kind==='nickname'?'Private nickname':'Personal note'}</h2>
+          <button type="button" className="icon-button" onClick={()=>setEditor(null)} aria-label="Close"><X size={20}/></button>
+        </header>
+        <form className="modal-content" onSubmit={saveEditor}>
+          <p>{editor.kind==='nickname'?'Only you will see this display name.':'Your private note will never appear in the conversation.'}</p>
+          {editor.kind==='nickname'?
+            <input autoFocus maxLength={40} value={editorValue} onChange={e=>setEditorValue(e.target.value)} placeholder="Friend nickname"/>:
+            <textarea autoFocus rows={5} maxLength={500} value={editorValue} onChange={e=>setEditorValue(e.target.value)} placeholder="Something to remember…"/>}
+          <button type="submit" className="primary-button">Save</button>
+        </form>
+      </section>
+    </div>}
     {picker && <div className="dialog-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) setPicker(false); }}>
       <section className="dialog dm-picker" role="dialog" aria-modal="true" aria-label="New direct message">
         <header><h2>New message</h2><button type="button" className="icon-button" aria-label="Close" onClick={() => setPicker(false)}><X size={20}/></button></header>

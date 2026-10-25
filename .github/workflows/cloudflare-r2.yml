@@ -1,0 +1,28 @@
+name: Validate Mirlume Cloud Storage
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'attachment-server/cloudflare-r2/**'
+      - '.github/workflows/cloudflare-r2.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'attachment-server/cloudflare-r2/**'
+      - '.github/workflows/cloudflare-r2.yml'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check Worker JavaScript syntax
+        run: node --check attachment-server/cloudflare-r2/worker.mjs
+      - name: Validate Worker bundle (does not deploy)
+        working-directory: attachment-server/cloudflare-r2
+        run: npx --yes wrangler@4 deploy --dry-run --outdir /tmp/mirlume-worker-build

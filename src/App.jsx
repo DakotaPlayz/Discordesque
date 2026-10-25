@@ -6,6 +6,8 @@ import {
 import { configured, confirmationUrl, supabase } from './lib/supabase.js';
 import { ChannelAttachments, ChannelUpload } from './components/ChannelAttachments.jsx';
 import DirectMessages from './components/DirectMessages.jsx';
+import ContextMenu from './components/ContextMenu.jsx';
+import {Bell,BellOff,CheckCheck,FolderHeart,FolderInput,LogOut as LeaveIcon,Eye,EyeOff,Lock,Mail,UserRound,VolumeX} from 'lucide-react';
 import {IdentityStudio,PersonAvatar,MediaImage,ProfilePeek} from './components/IdentityStudio.jsx';
 
 function initials(name) {
@@ -163,6 +165,8 @@ function ChatApp({ session }) {
   const [memberProfiles,setMemberProfiles] = useState({});
   const [peek,setPeek] = useState(null);
   const [servers, setServers] = useState([]);
+  const [serverPrefs,setServerPrefs] = useState({});
+  const [serverContext,setServerContext] = useState(null);
   const [channels, setChannels] = useState([]);
   const [activeServerId, setActiveServerId] = useState(null);
   const [activeChannelId, setActiveChannelId] = useState(null);
@@ -178,6 +182,86 @@ function ChatApp({ session }) {
   const messagesBottom = useRef(null);
 
   const currentName = profile?.display_name || 'Member';
+  const closeServerContext=useCallback(()=>setServerContext(null),[]);
+
+  const loadServerPreferences=useCallback(async()=>{
+    const {data,error:e}=await supabase.from('mirlume_server_preferences')
+      .select('*').eq('user_id',session.user.id);
+    if(e){console.warn('Server preferences unavailable; run context-menus-v0.5.2.sql',e.message);return;}
+    setServerPrefs(Object.fromEntries((data||[]).map(item=>[item.server_id,item])));
+  },[session.user.id]);
+
+  useEffect(()=>{loadServerPreferences();},[loadServerPreferences]);
+
+  async function saveServerPreference(serverId,changes){
+    const original=serverPrefs[serverId]||{};
+    const updated={user_id:session.user.id,server_id:serverId,
+      notification_level:'mentions',hide_muted_channels:false,
+      show_all_channels:true,allow_dm_from_members:true,
+      folder_name:'',favorite:false,...original,...changes,
+      updated_at:new Date().toISOString()};
+    setServerPrefs(old=>({...old,[serverId]:updated}));
+    const {error:e}=await supabase.from('mirlume_server_preferences').upsert(updated,{onConflict:'user_id,server_id'});
+    if(e){setServerPrefs(old=>({...old,[serverId]:original}));setError('Server preference not saved: '+e.message);}
+  }
+
+  async function leaveSpace(item){
+    if(item.owner_id===session.user.id){setError('Transfer server ownership before leaving your own space.');return;}
+    if(!window.confirm('Leave '+item.name+'? You will need a new invite to join again.'))return;
+    const {error:e}=await supabase.rpc('mirlume_leave_server',{p_server:item.id});
+    if(e){setError(e.message);return;}
+    await refreshServers();await loadServerPreferences();
+  }
+
+  const sortedServers=useMemo(()=>[...servers].sort((a,b)=>{
+    const pa=serverPrefs[a.id]||{},pb=serverPrefs[b.id]||{};
+    if(Boolean(pa.favorite)!==Boolean(pb.favorite))return pa.favorite?-1:1;
+    const folder=(pa.folder_name||'').localeCompare(pb.folder_name||'');
+    return folder||0;
+  }),[servers,serverPrefs]);
+
+  function menuForServer(item){
+    const pref=serverPrefs[item.id]||{};
+    const muted=Boolean(pref.muted_until&&(new Date(pref.muted_until).getTime()>Date.now()));
+    const muteFor=minutes=>saveServerPreference(item.id,{muted_until:minutes?new Date(Date.now()+minutes*60000).toISOString():null});
+    return [
+      {label:'Mark as Read',icon:CheckCheck,onClick:()=>saveServerPreference(item.id,{last_read_at:new Date().toISOString()})},
+      {label:'Invite to Server',icon:Mail,onClick:()=>{setDmMode(false);setActiveServerId(item.id);openDialog('invite');}},
+      {divider:true},
+      {label:'Mute Server',icon:VolumeX,description:muted?'Muted':'Choose duration',submenu:[
+        {label:'Unmute Server',onClick:()=>muteFor(null),disabled:!muted},
+        {label:'For 1 Hour',onClick:()=>muteFor(60)},
+        {label:'For 8 Hours',onClick:()=>muteFor(480)},
+        {label:'For 24 Hours',onClick:()=>muteFor(1440)},
+        {label:'For 7 Days',onClick:()=>muteFor(10080)}
+      ]},
+      {label:'Notification Settings',icon:Bell,description:'Saved preference; push alerts not yet supported',submenu:[
+        ...[['all','All Messages'],['mentions','Only Mentions'],['none','Nothing']].map(([value,label])=>({
+          label,checked:(pref.notification_level||'mentions')===value,
+          onClick:()=>saveServerPreference(item.id,{notification_level:value})
+        }))
+      ]},
+      {label:'Hide Muted Channels',icon:EyeOff,disabled:true,description:'Per-channel mute is not yet available'},
+      {label:'Show All Channels',icon:Eye,disabled:true,description:'Channel visibility controls coming later'},
+      {divider:true},
+      {label:'Privacy Settings',icon:Lock,submenu:[
+        {label:'Allow messages from members',checked:pref.allow_dm_from_members!==false,
+          onClick:()=>saveServerPreference(item.id,{allow_dm_from_members:pref.allow_dm_from_members===false})}
+      ]},
+      {label:'Edit Per-server Profile',icon:UserRound,onClick:()=>{setActiveServerId(item.id);setDmMode(false);openDialog('identity');}},
+      {divider:true},
+      {label:'Move to…',icon:FolderInput,submenu:[
+        ...['Favorites','Gaming','Friends','Other'].map(name=>({
+          label:name,checked:pref.folder_name===name,onClick:()=>saveServerPreference(item.id,{folder_name:name,favorite:name==='Favorites'})
+        })),
+        {label:'Remove from folder',onClick:()=>saveServerPreference(item.id,{folder_name:'',favorite:false})}
+      ]},
+      {divider:true},
+      {label:'Leave Server',icon:LeaveIcon,danger:true,
+        disabled:item.owner_id===session.user.id,description:item.owner_id===session.user.id?'Transfer ownership first':undefined,
+        onClick:()=>leaveSpace(item)}
+    ];
+  }
   const server = useMemo(() => servers.find((s) => s.id === activeServerId), [servers, activeServerId]);
   const channel = useMemo(() => channels.find((c) => c.id === activeChannelId), [channels, activeChannelId]);
   const isOwner = server?.owner_id === session.user.id;
@@ -389,16 +473,17 @@ function ChatApp({ session }) {
         <button type="button" className={'rail-brand rail-home' + (dmMode ? ' selected' : '')} title="Direct messages" aria-label="Direct messages" onClick={() => { setDmMode(true); setMobileSidebar(true); setError(''); }}><Brand compact /></button>
         <div className="rail-rule" />
         <div className="server-list">
-          {servers.map((item) => (
+          {sortedServers.map((item) => (
             <button title={item.name} aria-label={item.name} key={item.id}
-              className={'server-bubble' + (item.id === activeServerId ? ' active' : '')}
+              className={'server-bubble' + (item.id === activeServerId ? ' active' : '') + (serverPrefs[item.id]?.muted_until&&new Date(serverPrefs[item.id].muted_until)>new Date()?' is-muted':'')}
+              onContextMenu={event=>{event.preventDefault();setServerContext({x:event.clientX,y:event.clientY,item,title:item.name});}}
               onClick={() => selectServer(item.id)}><MediaImage bucket="mirlume-server-media" path={item.icon_path} alt={item.name} className="server-icon-image" fallback={initials(item.name)}/></button>
           ))}
         </div>
         <button className="server-bubble new-server" title="Create a space" aria-label="Create a space" onClick={() => openDialog('create')}><Plus size={24} /></button>
         <button className="server-bubble join-server" title="Join a space" aria-label="Join a space" onClick={() => openDialog('join')}><ArrowRight size={21} /></button>
       </nav>
-
+      {serverContext&&<ContextMenu menu={serverContext} onClose={closeServerContext} items={menuForServer(serverContext.item)}/>}
       {dmMode ? <DirectMessages session={session} servers={servers} displayName={currentName}
         openProfile={() => openDialog('identity')} profile={profile} sidebarOpen={mobileSidebar}
         setSidebarOpen={setMobileSidebar}/> : <>

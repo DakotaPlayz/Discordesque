@@ -5,7 +5,7 @@ You need an always-on Windows/Linux/Mac computer with at least 500 GB free disk,
 and an internet-reachable HTTPS endpoint (domain/reverse proxy) for outside users.
 
 Unlike peer-to-peer transfers, uploaded files stay available **while the sender
-is offline**, as long as THIS server is online. Files are purged after 7 days
+is offline**, as long as THIS server is online. Files are purged after 1 day
 by default; abandoned partial uploads after 12 hours.
 
 ## Setup

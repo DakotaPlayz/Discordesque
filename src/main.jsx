@@ -5,6 +5,7 @@ import './styles.css';
 import './polish.css';
 import './refine.css';
 import './studio.css';
+import './context-menus.css';
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
