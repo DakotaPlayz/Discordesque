@@ -53,18 +53,19 @@ async function saveRecord(env,record) {
   });
 }
 async function allRecords(env) {
-  // Appropriate for a three-person private app; paid scale should use
-  // indexed metadata/Durable Objects rather than full scans.
-  let cursor,results=[];
-  do {
-    const page=await env.FILES.list({prefix:'meta/',limit:500,...(cursor?{cursor}:{})});
-    for(const item of page.objects) {
-      const meta=await env.FILES.get(item.key);
-      if(meta){try{results.push(await meta.json());}catch{ /* corrupted metadata */ }}
-    }
-    cursor=page.truncated?page.cursor:undefined;
-  }while(cursor&&results.length<3000);
-  return results;
+  // Free Workers allow <= 50 subrequests per request. Keep a hard cap
+  // of 40 simultaneously retained files for this small private group.
+  // This still accommodates 25 x 20GB files (~500GB) but not unlimited
+  // tiny attachments. A production service should use Durable Objects.
+  const page=await env.FILES.list({prefix:'meta/',limit:41});
+  if(page.truncated || page.objects.length>40)
+    throw error('Private beta file-count quota full (max 40 retained uploads)',507);
+  const records=[];
+  for(const item of page.objects){
+    const object=await env.FILES.get(item.key);
+    if(object){try{records.push(await object.json());}catch{}}
+  }
+  return records;
 }
 async function ensureRecord(env,id,user) {
   const record=await getRecord(env,id);
