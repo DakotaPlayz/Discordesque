@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Download, FileUp, Paperclip, LoaderCircle, X, Check } from 'lucide-react';
 import { supabase } from '../lib/supabase.js';
+import {createPortal} from 'react-dom';
 
 const Native = registerPlugin('MirlumeFileWriter');
 const MAX = 20 * 1024 ** 3;
@@ -311,7 +312,7 @@ export default function FileTransfers({session, conversationId, peerId, peerName
       disabled={busy} onClick={()=>pick.current?.click()}>
       <Paperclip size={20}/>
     </button>
-    {transfers.length>0&&<div className="dm-file-history" aria-label="DM shared files">
+    {transfers.length>0&&document.getElementById('dm-file-panel-'+conversationId)&&createPortal(<div className="dm-file-history" aria-label="DM shared files">
       {transfers.map(item=><div className="dm-file-tile" key={item.id}>
         <div className="dm-file-symbol"><FileUp size={18}/></div>
         <div className="dm-file-description">
@@ -323,7 +324,7 @@ export default function FileTransfers({session, conversationId, peerId, peerName
               className="dm-file-download" aria-label={'Download '+item.filename}><Download size={16}/> Download</button>
           :<span className="dm-file-status">{item.transfer_status==='completed'?<Check size={14}/>:null}{item.transfer_status}</span>}
       </div>)}
-    </div>}
+    </div>,document.getElementById('dm-file-panel-'+conversationId))}
     {(busy||status||error)&&<div className="dm-transfer-state" role="status">
       <span>{busy?<LoaderCircle size={15} className="spinning"/>:null}{error||status}</span>
       {busy?<><strong>{progress}%</strong><button type="button" onClick={cancel} aria-label="Cancel transfer"><X size={15}/></button></>
