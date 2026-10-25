@@ -44,7 +44,7 @@ public class MirlumeFileWriterPlugin: CAPPlugin, CAPBridgedPlugin {
         let name = fileName.isEmpty ? "download.bin" : fileName
         let stem = (name as NSString).deletingPathExtension
         let ext = (name as NSString).pathExtension
-        let suffix = "-" + UUID().uuidString.prefix(10)
+        let suffix = "-" + String(UUID().uuidString.prefix(10))
         let unique = stem + suffix + (ext.isEmpty ? "" : "." + ext)
 
         do {
