@@ -30,6 +30,32 @@ Both `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` must exist as **repository
 
 In each completed run, open **Artifacts** to download the Windows EXE package or Android debug APK. Check the logs if a workflow is red; an artifact should not be assumed until GitHub reports that it built successfully.
 
+## Free verification website (GitHub Pages)
+
+**Website:** https://dakotaplayz.github.io/Discordesque/
+
+This is the same responsive Discordesque app, accessible in a web browser, with an additional email confirmation success/error page. No hosting subscription, domain purchase or new server is required for a public GitHub repository.
+
+### One-time GitHub Pages setting
+
+1. Open https://github.com/DakotaPlayz/Discordesque/settings/pages.
+2. Under **Build and deployment → Source**, choose **GitHub Actions** (not "Deploy from a branch").
+3. The included `Publish Discordesque Website` workflow automatically deploys on every push to `main`. If the first run failed because Pages was not enabled, manually re-run that workflow in https://github.com/DakotaPlayz/Discordesque/actions.
+4. Verify that https://dakotaplayz.github.io/Discordesque/ loads.
+
+### One-time Supabase email redirect setting (important)
+
+In the existing Supabase project, open **Authentication → URL Configuration** and set:
+
+- **Site URL:** `https://dakotaplayz.github.io/Discordesque/`
+- **Redirect URLs:** add `https://dakotaplayz.github.io/Discordesque/?confirmed=1`
+
+Save changes. The client sends new confirmation emails to that exact URL via `emailRedirectTo`. Without the allowlisted Redirect URL, Supabase may not send users to the intended confirmation page. <https://supabase.com/docs/guides/auth/redirect-urls>
+
+With **Confirm email** enabled, new users register on Windows, Android, iOS or the web, click the verification email, see a success message in their browser, and then sign in normally in their original app. No native deep-link setup is needed. Existing emails already sent may use the old redirect URL and are not retroactively changed.
+
+**Note:** Hosting GitHub Pages is free for this public repository. Supabase's own email sending limits still apply and may require custom SMTP as usage grows.
+
 ## Local development (Node.js 22+)
 
 ~~~sh
