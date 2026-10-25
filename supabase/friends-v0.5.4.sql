@@ -24,7 +24,7 @@ as $$
   select p.id,p.display_name from public.profiles p
   where auth.uid() is not null and p.id <> auth.uid()
     and char_length(btrim(coalesce(p_query,''))) >= 2
-    and p.display_name ilike ('%' || replace(replace(replace(btrim(p_query),'\\','\\\\'),'%','\\%'),'_','\\_') || '%') escape '\'
+    and p.display_name ilike ('%' || btrim(p_query) || '%')
   order by p.display_name,p.id limit 20;
 $$;
 
@@ -67,8 +67,7 @@ $$;
 drop policy if exists "Friends can read profiles" on public.profiles;
 create policy "Friends can read profiles" on public.profiles for select to authenticated
 using (exists(select 1 from public.mirlume_friends f
- where f.status='accepted' and
- ((f.user_low=auth.uid() and f.user_high=profiles.id) or
+ where ((f.user_low=auth.uid() and f.user_high=profiles.id) or
   (f.user_high=auth.uid() and f.user_low=profiles.id))));
 
 -- Extend the existing DM start rule: shared-server members OR accepted friends.
