@@ -22,7 +22,7 @@ function formatDay(date) {
 function Brand({ compact = false }) {
   return (
     <div className="brand">
-      <div className="brand-icon"><MessageCircle size={25} strokeWidth={2.6} /></div>
+      <div className="brand-icon"><span className="brand-letter">m<span className="brand-dot">.</span></span></div>
       {!compact && <span>Mirlume</span>}
     </div>
   );
