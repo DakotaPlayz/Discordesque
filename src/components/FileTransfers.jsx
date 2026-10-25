@@ -1,4 +1,4 @@
-// Discordesque v0.2: direct peer-to-peer file transfers.
+// Mirlume v0.4: encrypted transport for large files between DM contacts.
 // No file bytes are stored in Supabase. Supabase stores only offers and WebRTC setup messages.
 // 20 GiB on Windows (Electron native streaming) and browsers with a streaming save picker.
 // Mobile fallback is strictly capped to 32 MiB until a native stream writer is available.
@@ -77,12 +77,13 @@ async function makeWriter(offer) {
   };
 }
 
-export default function FileTransfers({ session, server, channel }) {
+export default function FileTransfers({ session, conversationId, peerId, peerName }) {
+  const channel = { id: conversationId };
   const userId = session.user.id;
   const [open, setOpen] = useState(false);
   const [offers, setOffers] = useState([]);
   const [members, setMembers] = useState([]);
-  const [recipient, setRecipient] = useState('');
+  const [recipient, setRecipient] = useState(peerId || '');
   const [file, setFile] = useState(null);
   const [status, setStatus] = useState('');
   const [progress, setProgress] = useState(0);
@@ -120,35 +121,20 @@ export default function FileTransfers({ session, server, channel }) {
   }, [userId]);
 
   const getOffers = useCallback(async () => {
-    if (!channel?.id) return;
+    if (!conversationId) return;
     const recent = new Date(Date.now() - 12 * 3600 * 1000).toISOString();
     const { data, error: dbError } = await supabase.from('file_transfers')
-      .select('id, sender_id, recipient_id, server_id, channel_id, filename, size_bytes, created_at')
-      .eq('channel_id', channel.id).eq('recipient_id', userId)
+       .select('id, sender_id, recipient_id, conversation_id, filename, size_bytes, created_at')
+      .eq('conversation_id', conversationId).eq('recipient_id', userId)
       .gte('created_at', recent).order('created_at', { ascending: false }).limit(15);
     if (dbError) throw dbError;
     if (mounted.current) setOffers(data || []);
-  }, [channel?.id, userId]);
+  }, [conversationId, userId]);
 
   useEffect(() => {
-    let live = true;
-    async function getMembers() {
-      if (!server?.id) return;
-      const { data: rows, error: membershipError } = await supabase.from('server_members')
-        .select('user_id').eq('server_id', server.id);
-      if (membershipError) { showError(membershipError); return; }
-      const ids = (rows || []).map(m => m.user_id).filter(id => id !== userId);
-      if (!ids.length) { if (live) setMembers([]); return; }
-      const { data: people } = await supabase.from('profiles').select('id,display_name').in('id', ids);
-      if (live) {
-        const names = ids.map(id => ({ id, display_name: people?.find(p => p.id === id)?.display_name || 'Member' }));
-        setMembers(names);
-        setRecipient(old => ids.includes(old) ? old : ids[0]);
-      }
-    }
-    getMembers();
-    return () => { live = false; };
-  }, [server?.id, userId, showError]);
+    setMembers(peerId ? [{ id: peerId, display_name: peerName || 'Contact' }] : []);
+    setRecipient(peerId || '');
+  }, [peerId, peerName]);
 
   const acceptIce = useCallback(async (ctx, candidate) => {
     if (!ctx || !candidate) return;
@@ -187,7 +173,7 @@ export default function FileTransfers({ session, server, channel }) {
   useEffect(() => {
     mounted.current = true;
     getOffers().catch(showError);
-    const realtime = supabase.channel('files-' + userId + '-' + channel.id)
+    const realtime = supabase.channel('dm-files-' + userId + '-' + channel.id)
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'file_transfers',
         filter: 'recipient_id=eq.' + userId,
@@ -335,14 +321,14 @@ export default function FileTransfers({ session, server, channel }) {
   }, [sendFile, showError]);
 
   async function startSending() {
-    if (!file || !recipient || !server?.id || !channel?.id) return;
+    if (!file || !recipient || !conversationId) return;
     if (active.current) { setError('Only one transfer can be active at a time.'); return; }
     if (file.size < 1 || file.size > MAX_BYTES) { setError('Choose a nonempty file no larger than 20 GiB.'); return; }
     setWorking(true); setProgress(0); setError(''); setStatus('Creating secure file invitation...');
     let pc;
     try {
       const { data: offer, error: createError } = await supabase.from('file_transfers').insert({
-        server_id: server.id, channel_id: channel.id, sender_id: userId,
+        conversation_id: conversationId, sender_id: userId,
         recipient_id: recipient, filename: file.name, size_bytes: file.size,
       }).select().single();
       if (createError) throw createError;
@@ -421,9 +407,9 @@ export default function FileTransfers({ session, server, channel }) {
     <div className="files-widget">
       <button type="button" className="file-share-button" title="Share files peer to peer" aria-label="Share file" onClick={() => { setOpen(v => !v); setError(''); }}><Paperclip size={20}/></button>
       {open && <div className="file-popover" role="dialog" aria-label="File sharing">
-        <div className="file-popover-title"><strong><FileUp size={19}/> Share a file</strong><button type="button" onClick={() => setOpen(false)} aria-label="Close file sharing"><X size={19}/></button></div>
-        <p className="file-help">Direct transfers up to <strong>20 GiB</strong>, no cloud storage. Both people must stay online in the channel. Some networks need a TURN relay.</p>
-        <label htmlFor="file-recipient">SEND TO</label>
+        <div className="file-popover-title"><strong><FileUp size={19}/> Send a large file</strong><button type="button" onClick={() => setOpen(false)} aria-label="Close file sharing"><X size={19}/></button></div>
+        <p className="file-help">One-to-one transfers up to <strong>20 GiB</strong> go directly between your devices. Both people must keep the conversation open. Some networks require a TURN relay.</p>
+        <label htmlFor="file-recipient">RECIPIENT</label>
         <select id="file-recipient" value={recipient} onChange={e => setRecipient(e.target.value)} disabled={working}>
           {members.length === 0 && <option value="">Invite a friend first</option>}
           {members.map(member => <option key={member.id} value={member.id}>{member.display_name}</option>)}
@@ -432,7 +418,7 @@ export default function FileTransfers({ session, server, channel }) {
         {file && <p className="file-info">{file.name} · {pretty(file.size)}</p>}
         <button className="primary-button wide" type="button" disabled={working || !file || !recipient} onClick={startSending}><FileUp size={17}/> Send file</button>
         {!!offers.length && <div className="file-incoming">
-          <strong>Incoming file invitations</strong>
+          <strong>Incoming private transfers</strong>
           {offers.map(offer => <div className="file-offer" key={offer.id}>
             <div className="file-offer-name">{offer.filename}<small>{pretty(offer.size_bytes)} · sender must be online</small></div>
             <div className="file-offer-actions"><button type="button" onClick={() => acceptOffer(offer)} disabled={working}><Download size={16}/> Accept</button><button type="button" onClick={() => rejectOffer(offer)} disabled={working}>Decline</button></div>
@@ -445,7 +431,7 @@ export default function FileTransfers({ session, server, channel }) {
         {working && <div className="file-meter"><div style={{width: progress + '%'}} /></div>}
         {working && <button type="button" className="file-cancel" onClick={cancelCurrent}>Cancel transfer</button>}
         {!!error && <p className="file-error" role="alert">{error}</p>}
-        <p className="file-disclaimer">20 GiB saving requires Windows or a compatible streaming file picker. Mobile fallback is limited to 32 MiB until native storage support is added. No resumable transfers yet.</p>
+        <p className="file-disclaimer">20 GiB receiving currently requires Windows or a compatible browser with a streaming save picker. Mobile fallback is limited to 32 MiB. Both parties must be online; no resume yet.</p>
       </div>}
     </div>
   );
