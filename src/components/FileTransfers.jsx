@@ -94,9 +94,16 @@ export default function FileTransfers({ session, server, channel }) {
   const mounted = useRef(true);
 
   const showError = useCallback((err) => {
+    // Release the network connection and partial disk file on any fatal failure.
+    const ctx = active.current;
+    if (ctx) {
+      active.current = null;
+      ctx.pc.close();
+      if (ctx.writer) Promise.resolve(ctx.writer.abort()).catch(() => {});
+    }
     if (mounted.current) {
       setError(err?.message || String(err));
-      setStatus('error');
+      setStatus('Transfer failed');
       setWorking(false);
     }
   }, []);
@@ -279,6 +286,7 @@ export default function FileTransfers({ session, server, channel }) {
             if (mounted.current) { setStatus('Received and saved successfully'); setProgress(100); setWorking(false); }
             ctx.writer = null;
             active.current = null;
+            setTimeout(() => ctx.pc.close(), 1500);
           }).catch(showError);
         }
         return;
@@ -317,6 +325,7 @@ export default function FileTransfers({ session, server, channel }) {
         if (packet.type === 'complete') {
           setStatus('Transfer complete'); setProgress(100); setWorking(false);
           active.current = null;
+          ctx.pc.close();
         }
       } catch { /* ignore malformed control packets */ }
     };
