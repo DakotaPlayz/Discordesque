@@ -17,10 +17,10 @@ Not in v0.1: voice calls, screen share, push notifications, attachments, moderat
 ## Configure once
 
 1. Make a free project at https://supabase.com/dashboard.
-2. In **SQL Editor**, run the entire file \`supabase/schema.sql\` once. It creates tables, secure functions and policies and enables Realtime publication for messages.
-3. From **Project Settings → API Keys**, find the **Project URL** and the **publishable key** (legacy \`anon\` key is also supported). Do **not** use the secret/service_role key.
-4. To run locally, copy \`.env.example\` to \`.env.local\` and fill in \`VITE_SUPABASE_URL\` and \`VITE_SUPABASE_ANON_KEY\`.
-5. To bake the same configuration into GitHub Actions builds for your friends, add **repository variables** (Settings → Secrets and variables → Actions → Variables) named \`VITE_SUPABASE_URL\` and \`VITE_SUPABASE_ANON_KEY\`. These keys are designed to be public; RLS is the actual authorization barrier.
+2. In **SQL Editor**, run the entire file `supabase/schema.sql` once. It creates tables, secure functions and policies and enables Realtime publication for messages.
+3. From **Project Settings → API Keys**, find the **Project URL** and the **publishable key** (legacy `anon` key is also supported). Do **not** use the secret/service_role key.
+4. To run locally, copy `.env.example` to `.env.local` and fill in `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+5. To bake the same configuration into GitHub Actions builds for your friends, add **repository variables** (Settings → Secrets and variables → Actions → Variables) named `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. These keys are designed to be public; RLS is the actual authorization barrier.
 
 For simplest registration testing, in Supabase **Authentication → Providers → Email**, you can adjust email confirmation requirements. For real use, keep confirmation enabled. Friends just register with their email/password, then join using the invite code you share privately; they do not need developer accounts.
 
@@ -54,7 +54,7 @@ npx cap sync android
 npx cap open android
 ~~~
 
-Build/run with Android Studio, or download the installable **debug APK** from **Actions → Build Android** in your repository. Updates to app code require \`npm run build && npx cap sync android\`.
+Build/run with Android Studio, or download the installable **debug APK** from **Actions → Build Android** in your repository. Updates to app code require `npm run build && npx cap sync android`.
 
 ## iOS
 
@@ -76,12 +76,11 @@ Supabase's free tier is useful for a small friends-only deployment, subject to i
 
 ## Build organization
 
-- \`src/App.jsx\`: interactive React client
-- \`src/styles.css\`: adaptive mobile/desktop styles
-- \`src/lib/supabase.js\`: API client initialized from build environment
-- \`electron/main.cjs\`: sandboxed Windows window
-- \`capacitor.config.json\`: mobile wrapper app identity
-- \`supabase/schema.sql\`: schema and RLS
-- \`.github/workflows/\`: Windows and Android builds
+- `src/App.jsx`: interactive React client
+- `src/styles.css`: adaptive mobile/desktop styles
+- `src/lib/supabase.js`: API client initialized from build environment
+- `electron/main.cjs`: sandboxed Windows window
+- `capacitor.config.json`: mobile wrapper app identity
+- `supabase/schema.sql`: schema and RLS
+- `.github/workflows/`: Windows and Android builds
 
-MIT licensed.
