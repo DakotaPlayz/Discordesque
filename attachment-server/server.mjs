@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { createClient } from '@supabase/supabase-js';
 import * as fs from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
-import { randomUUID } from 'node:crypto';
+import { randomUUID,createHash } from 'node:crypto';
 import path from 'node:path';
 
 // Optional, separately hosted Mirlume large-file service. Requires real disk.
@@ -19,6 +19,8 @@ if(!Number.isSafeInteger(quota)||quota<maxFile)throw Error('Quota must allow a 2
 if(!Number.isInteger(retentionDays)||retentionDays<1||retentionDays>30)throw Error('Retention must be 1–30 days');
 const authClient=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
 const locks=new Set();
+const sessionCache=new Map(),membershipCache=new Map();
+let reservationBusy=false;
 await fs.mkdir(metaDir,{recursive:true});await fs.mkdir(dataDir,{recursive:true});
 const valid=id=>/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(id||'');
 const metaPath=id=>path.join(metaDir,id+'.json');
@@ -32,14 +34,17 @@ async function listAll(){const files=[];for(const name of await fs.readdir(metaD
 async function remove(info){await Promise.allSettled([fs.unlink(metaPath(info.id)),fs.unlink(partPath(info.id)),fs.unlink(finalPath(info.id))]);}
 async function purge(){let count=0;for(const f of await listAll()){if(locks.has(f.id))continue;if(f.expires_at<Date.now()||(f.state==='uploading'&&f.created_at+12*3600000<Date.now())){await remove(f);count++;}}if(count)console.log('Purged expired/abandoned files:',count);}
 await purge();setInterval(()=>purge().catch(console.error),900000).unref();
-async function user(req){const m=/^Bearer\s+(.+)$/i.exec(req.headers.authorization||'');if(!m)throw problem('Sign in required',401);const {data,error}=await authClient.auth.getUser(m[1]);if(error||!data?.user?.id)throw problem('Session expired',401);return {id:data.user.id,token:m[1]};}
-async function membership(conv,token){if(!valid(conv))throw problem('Unknown conversation',404);const client=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false},global:{headers:{Authorization:'Bearer '+token}}});const {data,error}=await client.from('direct_conversations').select('id').eq('id',conv).maybeSingle();if(error||!data)throw problem('Not permitted in this conversation',403);}
+async function user(req){const m=/^Bearer\s+(.+)$/i.exec(req.headers.authorization||'');if(!m)throw problem('Sign in required',401);const digest=createHash('sha256').update(m[1]).digest('hex');const hit=sessionCache.get(digest);if(hit?.until>Date.now())return {id:hit.id,token:m[1]};const {data,error}=await authClient.auth.getUser(m[1]);if(error||!data?.user?.id)throw problem('Session expired',401);sessionCache.set(digest,{id:data.user.id,until:Date.now()+15000});if(sessionCache.size>500)sessionCache.clear();return {id:data.user.id,token:m[1]};}
+async function membership(conv,token){if(!valid(conv))throw problem('Unknown conversation',404);const cacheKey=createHash('sha256').update(token+':'+conv).digest('hex');if(membershipCache.get(cacheKey)>Date.now())return;const client=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false},global:{headers:{Authorization:'Bearer '+token}}});const {data,error}=await client.from('direct_conversations').select('id').eq('id',conv).maybeSingle();if(error||!data)throw problem('Not permitted in this conversation',403);membershipCache.set(cacheKey,Date.now()+15000);if(membershipCache.size>1000)membershipCache.clear();}
 async function jsonBody(req){let body='';for await(const bytes of req){body+=bytes.toString('utf8');if(body.length>8192)throw problem('Body too large',413);}try{return JSON.parse(body);}catch{throw problem('Invalid JSON');}}
 async function authorized(id,principal){const f=await getMeta(id);if(!f)throw problem('File not found',404);if(f.expires_at<Date.now())throw problem('File expired',410);await membership(f.conversation_id,principal.token);return f;}
 async function initialize(req,res,principal){
   const body=await jsonBody(req),filename=String(body.filename||'').slice(0,255),size=Number(body.size_bytes);
   if(!filename||!Number.isSafeInteger(size)||size<1||size>maxFile)throw problem('File must be between 1 byte and 20 GiB');
   await membership(body.conversation_id,principal.token);
+  if(reservationBusy)throw problem('Another storage reservation is being processed; retry',503);
+  reservationBusy=true;
+  try{
   const reserved=(await listAll()).filter(f=>f.expires_at>Date.now()).reduce((sum,f)=>sum+f.size_bytes,0);
   if(reserved+size>quota)throw problem('Storage quota full; old files are purged automatically',507);
   const stats=await fs.statfs(dataDir);
@@ -48,6 +53,8 @@ async function initialize(req,res,principal){
   const info={id,conversation_id:body.conversation_id,uploader_id:principal.id,filename,size_bytes:size,created_at:now,expires_at:now+ttl,uploaded_bytes:0,state:'uploading'};
   const h=await fs.open(partPath(id),'wx');await h.close();await save(info);
   reply(res,201,{file:info});
+  }finally{reservationBusy=false;}
+
 }
 async function upload(req,res,id,principal,query){
   const info=await authorized(id,principal);
