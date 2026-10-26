@@ -2,6 +2,7 @@ const { app, BrowserWindow, shell, ipcMain, dialog } = require('electron');
 const fs = require('node:fs/promises');
 const crypto = require('node:crypto');
 const path = require('node:path');
+const { autoUpdater } = require('electron-updater');
 
 const writers = new Map();
 let currentWindow;
@@ -112,7 +113,26 @@ ipcMain.handle('file:cancel', async (event, id) => {
   return true;
 });
 
+function initializeAutoUpdates() {
+  // Portable builds and development sessions cannot be safely installed over.
+  if (!app.isPackaged || process.env.PORTABLE_EXECUTABLE_FILE || process.platform !== 'win32') return;
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.on('error', error => console.warn('Mirlume update failed:', error.message));
+  autoUpdater.on('update-downloaded', () => {
+    // Downloaded updates install the next time the user closes Mirlume.
+    if (currentWindow && !currentWindow.isDestroyed()) {
+      currentWindow.setTitle('Mirlume — update ready (installs on exit)');
+    }
+  });
+  const check = () => autoUpdater.checkForUpdates().catch(error => console.warn('Update check failed:', error.message));
+  setTimeout(check, 15000);
+  const timer = setInterval(check, 60 * 60 * 1000);
+  app.on('before-quit', () => clearInterval(timer));
+}
+
 app.whenReady().then(() => {
+  initializeAutoUpdates();
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
