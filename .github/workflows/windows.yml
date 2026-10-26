@@ -28,7 +28,7 @@ jobs:
       - name: Validate update prompt and Electron main process
         run: |
           node --check electron/main.cjs
-          node --test tests/update-prompt.test.cjs tests/server-delete.test.mjs
+          node --test tests/update-prompt.test.cjs tests/server-delete.test.mjs tests/screen-share.test.mjs
       - name: Build portable app and installer
         run: npm run dist:win
         env:
