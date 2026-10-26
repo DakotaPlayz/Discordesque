@@ -60,3 +60,15 @@ WHERE contype='f' AND confrelid IN (
   'public.servers'::regclass, 'public.channels'::regclass,
   'public.messages'::regclass, 'public.server_members'::regclass
 );
+
+-- Receive incoming DM notifications through Supabase Realtime.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_class WHERE oid = to_regclass('public.direct_messages'))
+     AND NOT EXISTS (
+       SELECT 1 FROM pg_publication_tables
+       WHERE pubname='supabase_realtime' AND schemaname='public' AND tablename='direct_messages'
+     ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.direct_messages;
+  END IF;
+END $$;
