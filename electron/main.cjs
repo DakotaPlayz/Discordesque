@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, shell, ipcMain, dialog, session } = require('electron');
 const fs = require('node:fs/promises');
 const crypto = require('node:crypto');
 const path = require('node:path');
@@ -132,6 +132,18 @@ function initializeAutoUpdates() {
 }
 
 app.whenReady().then(() => {
+  // Allow microphone-only WebRTC requests from Mirlume's own packaged UI.
+  // Never allow video, screen capture, or arbitrary external origins.
+  const isOwnWindow = (webContents) => webContents === currentWindow?.webContents
+    && webContents.getURL().startsWith('file://');
+  session.defaultSession.setPermissionCheckHandler((webContents, permission) =>
+    permission === 'media' && isOwnWindow(webContents)
+  );
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
+    const types = details?.mediaTypes || [];
+    callback(permission === 'media' && isOwnWindow(webContents)
+      && types.includes('audio') && !types.includes('video'));
+  });
   initializeAutoUpdates();
   createWindow();
   app.on('activate', () => {
