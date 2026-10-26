@@ -34,7 +34,7 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Test Android safe areas and update version detection
-        run: node --test tests/versionCheck.test.js tests/safe-zones.test.mjs tests/server-delete.test.mjs
+        run: node --test tests/versionCheck.test.js tests/safe-zones.test.mjs tests/server-delete.test.mjs tests/screen-share.test.mjs
       - name: Build web assets
         run: npm run build
         env:
