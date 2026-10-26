@@ -9,7 +9,7 @@ Var MirlumeDesktopShortcutChoice
   StrCpy $MirlumeDesktopShortcutChoice ${BST_CHECKED}
 !macroend
 
-!macro customWelcomePage
+!macro customPageAfterChangeDir
   ; Display this optional choice in the assisted installer.
   Page custom MirlumeShortcutPageCreate MirlumeShortcutPageLeave
 !macroend
