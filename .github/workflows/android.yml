@@ -47,6 +47,10 @@ jobs:
         run: npx cap sync android
       - name: Install native writer and microphone permission
         run: node scripts/install-android-writer.mjs
+      - name: Verify required Android voice call permissions
+        run: |
+          grep -q 'android.permission.RECORD_AUDIO' android/app/src/main/AndroidManifest.xml
+          grep -q 'android.permission.MODIFY_AUDIO_SETTINGS' android/app/src/main/AndroidManifest.xml
       - name: Apply launcher icon and splash assets
         run: npm run assets:android
       - name: Set Android version from package.json
