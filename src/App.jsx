@@ -6,6 +6,7 @@ import {
 import { configured, confirmationUrl, supabase } from './lib/supabase.js';
 import { ChannelAttachments, ChannelUpload } from './components/ChannelAttachments.jsx';
 import DirectMessages from './components/DirectMessages.jsx';
+import { useVoiceCalls, VoiceCallPanel } from './components/VoiceCalls.jsx';
 import ContextMenu from './components/ContextMenu.jsx';
 import {Bell,BellOff,CheckCheck,FolderHeart,FolderInput,LogOut as LeaveIcon,Eye,EyeOff,Lock,Mail,UserRound,VolumeX} from 'lucide-react';
 import {IdentityStudio,PersonAvatar,MediaImage,ProfilePeek} from './components/IdentityStudio.jsx';
@@ -160,6 +161,7 @@ function ConfirmationScreen({ session, onContinue }) {
 }
 
 function ChatApp({ session }) {
+  const voice = useVoiceCalls(session.user.id);
   const [profile, setProfile] = useState(null);
   const [dmMode, setDmMode] = useState(false);
   const [memberProfiles,setMemberProfiles] = useState({});
@@ -559,7 +561,7 @@ function ChatApp({ session }) {
       {memberContext&&<ContextMenu menu={memberContext} onClose={()=>setMemberContext(null)} items={menuForMember(memberContext)}/>}
       {dmMode ? <DirectMessages session={session} servers={servers} displayName={currentName}
         openProfile={() => openDialog('identity')} profile={profile} sidebarOpen={mobileSidebar}
-        setSidebarOpen={setMobileSidebar} targetPeer={dmTarget}/> : <>
+        setSidebarOpen={setMobileSidebar} targetPeer={dmTarget} voice={voice}/> : <>
       <aside className="channel-sidebar">
         <div className="server-header"><div className="server-heading-text"><strong>{server?.name || 'Your spaces'}</strong>{server?.description&&<small>{server.description}</small>}</div><button className="icon-button" title="Server invitation" aria-label="Server invitation" onClick={() => openDialog(server ? 'invite' : 'join')}><UsersRound size={19} /></button></div>
         {server ? (
@@ -631,6 +633,7 @@ function ChatApp({ session }) {
       </main>
       </>}
 
+      <VoiceCallPanel voice={voice}/>
       {peek && <ProfilePeek person={peek} onClose={()=>setPeek(null)}/>}
       {modal && <Dialog title={modal==='identity'?'Personalize your Mirlume experience':dialogTitle[modal]} onClose={() => setModal('')}>
         {modal === 'identity' ? (
