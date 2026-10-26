@@ -1,6 +1,8 @@
 name: Build Mirlume Android
 
 on:
+  push:
+    branches: ['build/v0.5.9']
   # Build Android only after the matching Windows release workflow succeeds.
   workflow_run:
     workflows: [Build Mirlume Windows]
@@ -17,7 +19,7 @@ permissions:
 
 jobs:
   android:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
