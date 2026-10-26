@@ -1,6 +1,6 @@
 {
   "name": "mirlume",
-  "version": "0.5.5",
+  "version": "0.5.6",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
@@ -83,5 +83,8 @@
         "releaseType": "release"
       }
     ]
-  }
+  },
+  "description": "Mirlume private chat, file sharing and voice calling",
+  "author": "DakotaPlayz",
+  "repository": "https://github.com/DakotaPlayz/Discordesque"
 }
