@@ -99,10 +99,8 @@ export function useVoiceCalls(uid) {
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
     current.pc = pc;
     stream.getTracks().forEach(track => pc.addTrack(track, stream));
-    // Negotiate a dormant video sender when establishing voice calls. Attaching
-    // a screen track later with replaceTrack avoids a second offer/answer and
-    // requires no new Supabase signal types or expensive media servers.
-    current.screenTransceiver = pc.addTransceiver('video', { direction: 'sendrecv' });
+    // Keep ordinary calls audio-only for backward compatibility with older
+    // Mirlume apps. A video transceiver is added on the FIRST screen share.
     pc.ontrack = (event) => {
       if (currentRef.current !== current) return;
       if (event.track.kind === 'video') {
@@ -244,9 +242,8 @@ export function useVoiceCalls(uid) {
       setError('Screen capture is unavailable on this device. Try Mirlume for Windows or a supported desktop browser.');
       return;
     }
-    const transceiver = current.screenTransceiver;
-    if (!transceiver || !['sendrecv', 'sendonly'].includes(transceiver.currentDirection)) {
-      setError('Your friend needs the newest Mirlume version before you can share your screen. Both participants must support screen video.');
+    if (current.pc?.signalingState !== 'stable') {
+      setError('Please try sharing again after the call finishes connecting.');
       return;
     }
     current.screenStarting = true;
@@ -268,12 +265,35 @@ export function useVoiceCalls(uid) {
       }
       track.contentHint = 'detail'; // Sharper text, code, and desktop images.
       track.onended = () => { void stopScreenShare(); };
+      const transceiver = current.screenTransceiver ||
+        (current.screenTransceiver = current.pc.addTransceiver('video', { direction: 'sendrecv' }));
+      transceiver.direction = 'sendrecv';
       await transceiver.sender.replaceTrack(track);
       if (currentRef.current !== current) {
         display.getTracks().forEach(t => t.stop());
         return;
       }
       current.screenStream = display;
+      // A new video m-line must be offered once, AFTER the person explicitly
+      // clicks Share screen. The same existing (owner-checked) Supabase
+      // offer/answer signal types are reused for the mid-call renegotiation.
+      if (!['sendrecv', 'sendonly'].includes(transceiver.currentDirection)) {
+        const offer = await current.pc.createOffer();
+        await current.pc.setLocalDescription(offer);
+        await signal(current, 'offer', {
+          description: current.pc.localDescription.toJSON(), renegotiate: true
+        });
+        const expires = Date.now() + 12000;
+        while (currentRef.current === current && current.pc.signalingState !== 'stable' &&
+               Date.now() < expires) {
+          await new Promise(resolve => setTimeout(resolve, 120));
+        }
+        if (currentRef.current !== current) return;
+        if (current.pc.signalingState !== 'stable' ||
+            !['sendrecv', 'sendonly'].includes(transceiver.currentDirection)) {
+          throw new Error('Screen sharing was not accepted. Your friend may need Mirlume v0.5.12 or newer.');
+        }
+      }
       const parameters = transceiver.sender.getParameters();
       if (parameters.encodings?.length) {
         // This is a ceiling, not guaranteed bandwidth; WebRTC reduces bitrate
@@ -289,7 +309,17 @@ export function useVoiceCalls(uid) {
       setScreenInfo({ width: settings.width, height: settings.height, fps: settings.frameRate });
       setSharingScreen(true);
     } catch (err) {
-      if (display) display.getTracks().forEach(track => track.stop());
+      if (currentRef.current === current) {
+        if (current.pc?.signalingState === 'have-local-offer') {
+          try { await current.pc.setLocalDescription({ type: 'rollback' }); }
+          catch (rollbackError) { console.warn('Could not rollback screen offer:', rollbackError); }
+        }
+        try { await current.screenTransceiver?.sender.replaceTrack(null); }
+        catch (detachError) { console.warn('Could not detach failed screen:', detachError); }
+        if (current.screenTransceiver) current.screenTransceiver.direction = 'inactive';
+        current.screenStream = null;
+      }
+      if (display) display.getTracks().forEach(track => { track.onended = null; track.stop(); });
       if (currentRef.current === current && err?.name !== 'NotAllowedError' && err?.name !== 'AbortError') {
         setError('Could not share your screen: ' + (err?.message || String(err)));
       }
@@ -297,7 +327,7 @@ export function useVoiceCalls(uid) {
       current.screenStarting = false;
       setScreenBusy(false);
     }
-  }, [stopScreenShare]);
+  }, [stopScreenShare, signal]);
 
   const toggleMute = useCallback(() => {
     const stream = currentRef.current?.localStream;
@@ -313,7 +343,28 @@ export function useVoiceCalls(uid) {
     if (row.signal_type === 'offer') {
       if (Date.now() - Date.parse(row.created_at) > RING_TIMEOUT_MS) return;
       if (current) {
-        if (current.id !== row.call_id) {
+        if (current.id === row.call_id && row.payload?.renegotiate === true &&
+            current.peerId === row.sender_id && current.pc?.signalingState === 'stable') {
+          try {
+            const offer = row.payload.description;
+            if (!offer?.sdp || offer.type !== 'offer') return;
+            await current.pc.setRemoteDescription(new RTCSessionDescription(offer));
+            const video = current.pc.getTransceivers()
+              .find(transceiver => transceiver.receiver.track.kind === 'video');
+            if (video) {
+              current.screenTransceiver = video;
+              video.direction = 'sendrecv';
+            }
+            const answer = await current.pc.createAnswer();
+            await current.pc.setLocalDescription(answer);
+            await signal(current, 'answer', {
+              description: current.pc.localDescription.toJSON(), renegotiate: true
+            });
+          } catch (err) {
+            console.warn('Could not negotiate incoming screen:', err);
+            setError('Unable to receive a shared screen: ' + err.message);
+          }
+        } else if (current.id !== row.call_id) {
           const busy = { id: row.call_id, conversationId: row.conversation_id, peerId: row.sender_id };
           void signal(busy, 'decline', { reason: 'busy' }).catch(console.warn);
         }
@@ -344,6 +395,16 @@ export function useVoiceCalls(uid) {
       else {
         try { await current.pc.addIceCandidate(new RTCIceCandidate(candidate)); }
         catch (e) { console.warn('Failed to add ICE candidate:', e); }
+      }
+    } else if (row.signal_type === 'answer' && row.payload?.renegotiate === true &&
+               current.pc?.signalingState === 'have-local-offer') {
+      try {
+        const answer = row.payload.description;
+        if (!answer?.sdp || answer.type !== 'answer') return;
+        await current.pc.setRemoteDescription(new RTCSessionDescription(answer));
+      } catch (err) {
+        console.warn('Screen sharing answer was rejected:', err);
+        setError('Unable to establish screen sharing: ' + err.message);
       }
     } else if (row.signal_type === 'answer' && current.phase === 'calling' && current.pc) {
       try {
