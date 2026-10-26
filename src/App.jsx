@@ -9,7 +9,7 @@ import DirectMessages from './components/DirectMessages.jsx';
 import { useVoiceCalls, VoiceCallPanel } from './components/VoiceCalls.jsx';
 import AndroidUpdateNotice from './components/AndroidUpdateNotice.jsx';
 import ContextMenu from './components/ContextMenu.jsx';
-import {Bell,BellOff,CheckCheck,FolderHeart,FolderInput,LogOut as LeaveIcon,Eye,EyeOff,Lock,Mail,UserRound,VolumeX} from 'lucide-react';
+import {Bell,BellOff,CheckCheck,FolderHeart,FolderInput,LogOut as LeaveIcon,Eye,EyeOff,Lock,Mail,UserRound,VolumeX,Trash2,AlertTriangle} from 'lucide-react';
 import {IdentityStudio,PersonAvatar,MediaImage,ProfilePeek} from './components/IdentityStudio.jsx';
 
 function initials(name) {
@@ -170,6 +170,10 @@ function ChatApp({ session }) {
   const [servers, setServers] = useState([]);
   const [serverPrefs,setServerPrefs] = useState({});
   const [serverContext,setServerContext] = useState(null);
+  const [deleteTarget,setDeleteTarget] = useState(null);
+  const [deletingServer,setDeletingServer] = useState(false);
+  const [deleteError,setDeleteError] = useState('');
+  const deletingServerRef = useRef(false);
   const [memberContext,setMemberContext] = useState(null);
   const [dmTarget,setDmTarget] = useState(null);
   const [channels, setChannels] = useState([]);
@@ -218,35 +222,72 @@ function ChatApp({ session }) {
     await refreshServers();await loadServerPreferences();
   }
 
-  async function deleteSpace(item){
-    if(item.owner_id!==session.user.id){setError('Only the server owner can delete this server.');return;}
-    const confirmation=window.prompt('Permanently delete "'+item.name+'" and all its channels and messages for everyone?\n\nType the server name exactly to confirm:');
-    if(confirmation===null)return;
-    if(confirmation!==item.name){setError('Deletion canceled: server name did not match.');return;}
-    setError('');
+  function requestDeleteServer(item) {
+    if (item.owner_id !== session.user.id) {
+      setError('Only the server owner can delete this server.');
+      return;
+    }
+    // window.prompt() is unreliable in Android WebViews and packaged Electron.
+    // A normal React dialog also works with touch, mouse, and keyboard.
+    setDeleteError('');
+    setDeleteTarget({ id: item.id, name: item.name, owner_id: item.owner_id });
+    setServerContext(null);
+  }
+
+  async function confirmDeleteServer() {
+    const item = deleteTarget;
+    if (!item || deletingServerRef.current) return;
+    if (item.owner_id !== session.user.id) {
+      setDeleteError('Only the server owner can delete this server.');
+      return;
+    }
+    deletingServerRef.current = true;
+    setDeletingServer(true);
+    setDeleteError('');
     try {
-      const {data, error:e}=await supabase.rpc('mirlume_delete_server',{p_server:item.id});
-      if(e){
-        const missing=/mirlume_delete_server|PGRST202|does not exist|schema cache/i.test(e.message||'');
-        setError(missing
-          ? 'Server deletion is not set up in Supabase yet. Run supabase/delete-server-v0.5.5.sql in the Supabase SQL Editor, then try again. ('+e.message+')'
-          : 'Could not delete server: '+e.message+' — if the database mentions a foreign key, run supabase/delete-server-v0.5.5.sql');
+      // The SECURITY DEFINER RPC independently checks auth.uid() is the owner;
+      // showing a confirmation dialog does not weaken ownership permissions.
+      const { data, error: rpcError } = await supabase.rpc('mirlume_delete_server', { p_server: item.id });
+      if (rpcError) {
+        const missing = /mirlume_delete_server|PGRST202|schema cache|does not exist/i.test(rpcError.message || '');
+        setDeleteError(missing
+          ? 'Server deletion needs Supabase setup. Run supabase/delete-server-v0.5.5.sql in SQL Editor. (' + rpcError.message + ')'
+          : 'Could not delete server: ' + rpcError.message);
         return;
       }
-      if(data!==true){
-        setError('Server deletion was not confirmed by the database. Please try again.');
+      if (data !== true) {
+        setDeleteError('Server deletion was not confirmed by the database. Nothing was removed.');
         return;
       }
-      // Check the server is actually gone instead of treating a successful RPC as a UI-only removal.
-      const {data:remaining,error:checkError}=await supabase.from('servers')
-        .select('id').eq('id',item.id).maybeSingle();
-      if(checkError){setError('Deletion requested but verification failed: '+checkError.message);return;}
-      if(remaining){setError('The server still exists in the database. Deletion was not completed.');return;}
+      // Confirm deletion on the server before removing it from the interface.
+      const { data: remaining, error: checkError } = await supabase.from('servers')
+        .select('id').eq('id', item.id).maybeSingle();
+      if (checkError) {
+        setDeleteError('The server reported deletion, but verification failed: ' + checkError.message);
+        return;
+      }
+      if (remaining) {
+        setDeleteError('The server still exists in the database. Try again or contact the server owner.');
+        return;
+      }
+      setServers(old => old.filter(server => server.id !== item.id));
+      setServerPrefs(old => {
+        const next = { ...old };
+        delete next[item.id];
+        return next;
+      });
+      setActiveServerId(old => old === item.id ? null : old);
+      setDeleteTarget(null);
       setServerContext(null);
+      setError('');
+      // Sync the full server/channel list with every client after deletion.
       await refreshServers();
       await loadServerPreferences();
-    } catch(err) {
-      setError('Could not delete server: '+(err?.message||String(err)));
+    } catch (err) {
+      setDeleteError('Could not delete server: ' + (err?.message || String(err)));
+    } finally {
+      deletingServerRef.current = false;
+      setDeletingServer(false);
     }
   }
 
@@ -295,7 +336,7 @@ function ChatApp({ session }) {
       ]},
       {divider:true},
       item.owner_id===session.user.id
-        ? {label:'Delete Server',icon:LeaveIcon,danger:true,description:'Permanently delete this server',onClick:()=>deleteSpace(item)}
+        ? {label:'Delete Server',icon:Trash2,danger:true,description:'Ask for confirmation before deleting',onClick:()=>requestDeleteServer(item)}
         : {label:'Leave Server',icon:LeaveIcon,danger:true,onClick:()=>leaveSpace(item)}
     ];
   }
@@ -564,7 +605,7 @@ function ChatApp({ session }) {
         openProfile={() => openDialog('identity')} profile={profile} sidebarOpen={mobileSidebar}
         setSidebarOpen={setMobileSidebar} targetPeer={dmTarget} voice={voice}/> : <>
       <aside className="channel-sidebar">
-        <div className="server-header"><div className="server-heading-text"><strong>{server?.name || 'Your spaces'}</strong>{server?.description&&<small>{server.description}</small>}</div><button className="icon-button" title="Server invitation" aria-label="Server invitation" onClick={() => openDialog(server ? 'invite' : 'join')}><UsersRound size={19} /></button></div>
+        <div className="server-header"><div className="server-heading-text"><strong>{server?.name || 'Your spaces'}</strong>{server?.description&&<small>{server.description}</small>}</div><div className="server-header-actions">{isOwner && <button type="button" className="icon-button server-header-delete" title="Delete server" aria-label="Delete server" onClick={() => requestDeleteServer(server)}><Trash2 size={19}/></button>}<button className="icon-button" title="Server invitation" aria-label="Server invitation" onClick={() => openDialog(server ? 'invite' : 'join')}><UsersRound size={19} /></button></div></div>
         {server ? (
           <>
             <div className="server-showcase">
@@ -636,6 +677,21 @@ function ChatApp({ session }) {
 
       <VoiceCallPanel voice={voice}/>
       {peek && <ProfilePeek person={peek} onClose={()=>setPeek(null)}/>}
+      {deleteTarget && <Dialog title="Delete server?" onClose={() => { if (!deletingServerRef.current) { setDeleteTarget(null); setDeleteError(''); } }}>
+        <div className="modal-content delete-server-confirmation">
+          <div className="delete-server-warning"><AlertTriangle size={22} aria-hidden="true"/><div>
+            <strong>Are you sure you want to delete &quot;{deleteTarget.name}&quot;?</strong>
+            <p>This permanently deletes the server and its channels, messages, and memberships for everyone. This cannot be undone.</p>
+          </div></div>
+          {deleteError && <div className="inline-notice" role="alert">{deleteError}</div>}
+          <div className="modal-actions">
+            <button type="button" className="secondary-button" disabled={deletingServer} onClick={() => { setDeleteTarget(null); setDeleteError(''); }}>Cancel</button>
+            <button type="button" className="delete-server-confirm-button" disabled={deletingServer} onClick={confirmDeleteServer}>
+              <Trash2 size={17} aria-hidden="true"/>{deletingServer ? 'Deleting…' : 'Yes, delete server'}
+            </button>
+          </div>
+        </div>
+      </Dialog>}
       {modal && <Dialog title={modal==='identity'?'Personalize your Mirlume experience':dialogTitle[modal]} onClose={() => setModal('')}>
         {modal === 'identity' ? (
           <IdentityStudio session={session} profile={profile} server={server} isOwner={isOwner}
