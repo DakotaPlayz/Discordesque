@@ -2,9 +2,18 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Phone, PhoneOff, Mic, MicOff, Volume2 } from 'lucide-react';
 import { supabase } from '../lib/supabase.js';
 import { CallRingtone } from './CallRingtone.jsx';
+import { Capacitor } from '@capacitor/core';
 
 const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }];
 const RING_TIMEOUT_MS = 60000;
+
+function describeMicrophoneError(err) {
+  if (Capacitor.getPlatform() === 'android' &&
+      (err?.name === 'NotAllowedError' || /permission denied/i.test(err?.message || ''))) {
+    return 'Android denied WebRTC microphone access. This may happen in older Mirlume APKs that lack MODIFY_AUDIO_SETTINGS. Install the newest Android build and try again. If it persists, check Microphone in Android app permissions.';
+  }
+  return err?.message || 'Could not access the microphone.';
+}
 
 // Signaling only: audio goes directly between peers over WebRTC, not through Supabase.
 // Public STUN works on many home networks; restrictive NATs still require a TURN relay.
@@ -145,7 +154,7 @@ export function useVoiceCalls(uid) {
       }
       scheduleTimeout(current);
     } catch (e) {
-      if (currentRef.current === current) finish(e.message || 'Unable to start voice call.');
+      if (currentRef.current === current) finish(describeMicrophoneError(e));
     }
   }, [attachPeer, finish, scheduleTimeout, signal]);
 
@@ -168,7 +177,7 @@ export function useVoiceCalls(uid) {
     } catch (e) {
       if (currentRef.current === current) {
         await endCall('decline');
-        setError(e.message || 'Could not answer the call.');
+        setError(describeMicrophoneError(e));
       }
     }
   }, [attachPeer, endCall, flushCandidates, signal]);
