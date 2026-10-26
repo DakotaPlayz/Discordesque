@@ -196,7 +196,7 @@ async function purge(env) {
 export default {
  async fetch(request,env) {
   const origin=request.headers.get('Origin');
-  const allowed=String(env.MIRLUME_ALLOWED_ORIGINS||'https://dakotaplayz.github.io,http://localhost:5173,capacitor://localhost,http://localhost,null')
+  const allowed=String(env.MIRLUME_ALLOWED_ORIGINS||'https://dakotaplayz.github.io,http://localhost:5173,capacitor://localhost,http://localhost,https://localhost,null')
     .split(',').map(x=>x.trim());
   if(origin&&!allowed.includes(origin))return json({error:'Origin forbidden'},403);
   const cors=origin?{'Access-Control-Allow-Origin':origin,Vary:'Origin'}:{};
