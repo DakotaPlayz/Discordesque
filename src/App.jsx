@@ -226,8 +226,8 @@ function ChatApp({ session }) {
       if(e){
         const missing=/mirlume_delete_server|PGRST202|does not exist|schema cache/i.test(e.message||'');
         setError(missing
-          ? 'Server deletion is not set up in Supabase yet. Run supabase/delete-server-v0.5.3.sql in the Supabase SQL Editor, then try again. ('+e.message+')'
-          : 'Could not delete server: '+e.message);
+          ? 'Server deletion is not set up in Supabase yet. Run supabase/delete-server-v0.5.5.sql in the Supabase SQL Editor, then try again. ('+e.message+')'
+          : 'Could not delete server: '+e.message+' — if the database mentions a foreign key, run supabase/delete-server-v0.5.5.sql');
         return;
       }
       if(data!==true){
@@ -397,6 +397,23 @@ function ChatApp({ session }) {
     setChannels([]);
     if (activeServerId) refreshChannels(activeServerId);
   }, [activeServerId, refreshChannels]);
+
+  // One app-wide listener keeps DM and server message sounds working even
+  // when another conversation is selected. Realtime RLS limits visible rows.
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    const notificationChannel = supabase.channel('mirlume-incoming-sound-' + session.user.id)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages' },
+        ({ new: message }) => {
+          if (message?.author_id !== session.user.id) playIncomingMessageSound();
+        })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' },
+        ({ new: message }) => {
+          if (message?.author_id !== session.user.id) playIncomingMessageSound();
+        })
+      .subscribe();
+    return () => { supabase.removeChannel(notificationChannel); };
+  }, [session?.user?.id]);
 
   useEffect(() => {
     if (!activeChannelId) { setMessages([]); return; }
@@ -639,6 +656,32 @@ function ChatApp({ session }) {
       </Dialog>}
     </div>
   );
+}
+
+
+// Play a short two-note chime for an incoming message, without downloading audio assets.
+function playIncomingMessageSound() {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    const context = new AudioContextClass();
+    if (context.state === 'suspended') { context.resume().catch(() => {}); }
+    const start = context.currentTime;
+    [660, 880].forEach((frequency, index) => {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      const time = start + index * 0.105;
+      oscillator.type = 'sine';
+      oscillator.frequency.value = frequency;
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.exponentialRampToValueAtTime(0.08, time + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.17);
+      oscillator.connect(gain).connect(context.destination);
+      oscillator.start(time);
+      oscillator.stop(time + 0.18);
+    });
+    setTimeout(() => context.close().catch(() => {}), 650);
+  } catch (error) { console.warn('Could not play notification sound:', error); }
 }
 
 export default function App() {
