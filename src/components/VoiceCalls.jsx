@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Phone, PhoneOff, Mic, MicOff, Volume2 } from 'lucide-react';
+import { Phone, PhoneOff, Mic, MicOff, Volume2, MonitorUp, MonitorOff, Maximize2 } from 'lucide-react';
 import { supabase } from '../lib/supabase.js';
 import { CallRingtone } from './CallRingtone.jsx';
 import { Capacitor } from '@capacitor/core';
@@ -21,6 +21,10 @@ export function useVoiceCalls(uid) {
   const [call, setCall] = useState(null);
   const [muted, setMuted] = useState(false);
   const [remoteStream, setRemoteStream] = useState(null);
+  const [remoteScreenStream, setRemoteScreenStream] = useState(null);
+  const [sharingScreen, setSharingScreen] = useState(false);
+  const [screenBusy, setScreenBusy] = useState(false);
+  const [screenInfo, setScreenInfo] = useState(null);
   const [error, setError] = useState('');
   const currentRef = useRef(null);
   const timeoutRef = useRef(null);
@@ -39,6 +43,10 @@ export function useVoiceCalls(uid) {
     timeoutRef.current = null;
     const current = currentRef.current;
     currentRef.current = null;
+    if (current?.screenStream) {
+      current.screenStream.getTracks().forEach(track => { track.onended = null; track.stop(); });
+      current.screenStream = null;
+    }
     if (current?.localStream) current.localStream.getTracks().forEach(track => track.stop());
     if (current?.pc) {
       current.pc.onicecandidate = null;
@@ -49,6 +57,10 @@ export function useVoiceCalls(uid) {
     setCall(null);
     setMuted(false);
     setRemoteStream(null);
+    setRemoteScreenStream(null);
+    setSharingScreen(false);
+    setScreenBusy(false);
+    setScreenInfo(null);
     if (message) setError(message);
   }, []);
 
@@ -87,9 +99,28 @@ export function useVoiceCalls(uid) {
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
     current.pc = pc;
     stream.getTracks().forEach(track => pc.addTrack(track, stream));
+    // Negotiate a dormant video sender when establishing voice calls. Attaching
+    // a screen track later with replaceTrack avoids a second offer/answer and
+    // requires no new Supabase signal types or expensive media servers.
+    current.screenTransceiver = pc.addTransceiver('video', { direction: 'sendrecv' });
     pc.ontrack = (event) => {
-      if (currentRef.current === current) {
-        setRemoteStream(event.streams[0] || new MediaStream([event.track]));
+      if (currentRef.current !== current) return;
+      if (event.track.kind === 'video') {
+        const track = event.track;
+        const show = () => {
+          if (currentRef.current === current && track.readyState === 'live' && !track.muted) {
+            setRemoteScreenStream(new MediaStream([track]));
+          }
+        };
+        const hide = () => {
+          if (currentRef.current === current) setRemoteScreenStream(null);
+        };
+        track.onunmute = show;
+        track.onmute = hide;
+        track.onended = hide;
+        show();
+      } else if (event.track.kind === 'audio') {
+        setRemoteStream(new MediaStream([event.track]));
       }
     };
     pc.onicecandidate = (event) => {
@@ -181,6 +212,88 @@ export function useVoiceCalls(uid) {
       }
     }
   }, [attachPeer, endCall, flushCandidates, signal]);
+
+  const stopScreenShare = useCallback(async () => {
+    const current = currentRef.current;
+    const display = current?.screenStream;
+    if (!display) return;
+    current.screenStream = null;
+    display.getTracks().forEach(track => { track.onended = null; });
+    try {
+      // Track removal needs no renegotiation; the receiving track mutes.
+      if (current.screenTransceiver?.sender && current.pc?.signalingState !== 'closed') {
+        await current.screenTransceiver.sender.replaceTrack(null);
+      }
+    } catch (err) {
+      console.warn('Could not detach screen sharing track:', err);
+    } finally {
+      display.getTracks().forEach(track => track.stop());
+      setSharingScreen(false);
+      setScreenInfo(null);
+    }
+  }, []);
+
+  const startScreenShare = useCallback(async () => {
+    const current = currentRef.current;
+    if (!current || current.phase !== 'connected' || current.screenStream || current.screenStarting) return;
+    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+      setError('Android screen broadcasting needs a native MediaProjection module. You can still watch a friend’s screen in Mirlume.');
+      return;
+    }
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      setError('Screen capture is unavailable on this device. Try Mirlume for Windows or a supported desktop browser.');
+      return;
+    }
+    const transceiver = current.screenTransceiver;
+    if (!transceiver || !['sendrecv', 'sendonly'].includes(transceiver.currentDirection)) {
+      setError('Your friend needs the newest Mirlume version before you can share your screen. Both participants must support screen video.');
+      return;
+    }
+    current.screenStarting = true;
+    setScreenBusy(true);
+    setError('');
+    let display;
+    try {
+      // Do not force a lower width/height: let the display picker capture
+      // the monitor's native dimensions. 60 FPS is best effort.
+      display = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: { ideal: 60, max: 60 } },
+        audio: false
+      });
+      const track = display.getVideoTracks()[0];
+      if (!track) throw new Error('No video track was returned from the selected screen.');
+      if (currentRef.current !== current || current.pc?.connectionState === 'closed') {
+        display.getTracks().forEach(t => t.stop());
+        return;
+      }
+      track.contentHint = 'detail'; // Sharper text, code, and desktop images.
+      track.onended = () => { void stopScreenShare(); };
+      await transceiver.sender.replaceTrack(track);
+      current.screenStream = display;
+      const parameters = transceiver.sender.getParameters();
+      if (parameters.encodings?.length) {
+        // This is a ceiling, not guaranteed bandwidth; WebRTC reduces bitrate
+        // or framerate on slow links. Do not send screen pixels via Supabase/R2.
+        parameters.encodings[0].maxFramerate = 60;
+        parameters.encodings[0].maxBitrate = 25000000;
+        parameters.encodings[0].scaleResolutionDownBy = 1;
+        parameters.degradationPreference = 'maintain-resolution';
+        try { await transceiver.sender.setParameters(parameters); }
+        catch (err) { console.warn('Video encoding tuning unavailable; using WebRTC defaults:', err); }
+      }
+      const settings = track.getSettings();
+      setScreenInfo({ width: settings.width, height: settings.height, fps: settings.frameRate });
+      setSharingScreen(true);
+    } catch (err) {
+      if (display) display.getTracks().forEach(track => track.stop());
+      if (currentRef.current === current && err?.name !== 'NotAllowedError' && err?.name !== 'AbortError') {
+        setError('Could not share your screen: ' + (err?.message || String(err)));
+      }
+    } finally {
+      current.screenStarting = false;
+      setScreenBusy(false);
+    }
+  }, [stopScreenShare]);
 
   const toggleMute = useCallback(() => {
     const stream = currentRef.current?.localStream;
@@ -284,11 +397,13 @@ export function useVoiceCalls(uid) {
   }, [uid, handleSignal]);
 
   return { call, muted, remoteStream, error, dismissError: () => setError(''),
+    remoteScreenStream, sharingScreen, screenBusy, screenInfo, startScreenShare, stopScreenShare,
     startCall, acceptCall, endCall, toggleMute };
 }
 
 export function VoiceCallPanel({ voice }) {
   const audioRef = useRef(null);
+  const videoRef = useRef(null);
   const [needsAudio, setNeedsAudio] = useState(false);
   useEffect(() => {
     const audio = audioRef.current;
@@ -298,6 +413,13 @@ export function VoiceCallPanel({ voice }) {
     if (voice.remoteStream) audio.play().catch(() => setNeedsAudio(true));
   }, [voice.remoteStream]);
 
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.srcObject = voice.remoteScreenStream;
+    if (voice.remoteScreenStream) video.play().catch(error => console.warn('Screen preview could not autoplay:', error));
+  }, [voice.remoteScreenStream, voice.call?.id]);
+  const canSendScreen = !(Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android');
   return <>
     <audio ref={audioRef} autoPlay playsInline />
     <CallRingtone call={voice.call} />
@@ -305,7 +427,7 @@ export function VoiceCallPanel({ voice }) {
       <span>{voice.error}</span>
       <button type="button" aria-label="Dismiss voice call message" onClick={voice.dismissError}>×</button>
     </div>}
-    {voice.call && <section className="voice-call-panel" role="dialog" aria-label="Voice call" aria-live="polite">
+    {voice.call && <section className={'voice-call-panel' + (voice.remoteScreenStream ? ' with-screen' : '')} role="dialog" aria-label="Voice call" aria-live="polite">
       <div className="voice-call-info">
         <Phone size={19} />
         <span><strong>{voice.call.peerName}</strong>
@@ -318,6 +440,18 @@ export function VoiceCallPanel({ voice }) {
           }[voice.call.phase] || 'Voice call'}</small>
         </span>
       </div>
+      {voice.remoteScreenStream && <div className="voice-screen-viewer">
+        <div className="voice-screen-heading"><span>{voice.call.peerName} is sharing their screen</span>
+          <button type="button" className="icon-button" title="Full screen" aria-label="View shared screen full screen"
+            onClick={() => videoRef.current?.requestFullscreen?.()}><Maximize2 size={18}/></button>
+        </div>
+        <video ref={videoRef} autoPlay playsInline className="voice-screen-video" aria-label="Shared screen video"/>
+      </div>}
+      {voice.sharingScreen && <div className="voice-screen-status" role="status">
+        <MonitorUp size={16}/> Sharing your screen{voice.screenInfo?.width && voice.screenInfo?.height
+          ? ' · ' + voice.screenInfo.width + '×' + voice.screenInfo.height + (voice.screenInfo.fps ? ' · target ' + Math.round(voice.screenInfo.fps) + ' FPS' : '')
+          : ' · up to 60 FPS'}
+      </div>}
       <div className="voice-call-actions">
         {voice.call.phase === 'incoming'
           ? <button type="button" className="voice-call-accept" onClick={voice.acceptCall}><Phone size={17}/> Answer</button>
@@ -326,6 +460,13 @@ export function VoiceCallPanel({ voice }) {
               title={voice.muted ? 'Unmute microphone' : 'Mute microphone'}>
               {voice.muted ? <MicOff size={20}/> : <Mic size={20}/>}
             </button>}
+        {voice.call.phase === 'connected' && canSendScreen && <button type="button"
+          className={'voice-screen-button' + (voice.sharingScreen ? ' sharing' : '')}
+          disabled={voice.screenBusy}
+          onClick={voice.sharingScreen ? voice.stopScreenShare : voice.startScreenShare}>
+          {voice.sharingScreen ? <MonitorOff size={17}/> : <MonitorUp size={17}/>}
+          {voice.screenBusy ? 'Starting…' : voice.sharingScreen ? 'Stop sharing' : 'Share screen'}
+        </button>}
         {needsAudio && <button type="button" className="icon-button"
           title="Enable incoming audio" onClick={() => audioRef.current?.play().then(() => setNeedsAudio(false)).catch(() => {})}>
           <Volume2 size={20}/>
