@@ -3,6 +3,7 @@ const fs = require('node:fs/promises');
 const crypto = require('node:crypto');
 const path = require('node:path');
 const { autoUpdater } = require('electron-updater');
+const { makeUpdateReadyDialog } = require('./update-prompt.cjs');
 
 const writers = new Map();
 let currentWindow;
@@ -118,11 +119,41 @@ function initializeAutoUpdates() {
   if (!app.isPackaged || process.env.PORTABLE_EXECUTABLE_FILE || process.platform !== 'win32') return;
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
+  let promptedVersion = null;
   autoUpdater.on('error', error => console.warn('Mirlume update failed:', error.message));
-  autoUpdater.on('update-downloaded', () => {
-    // Downloaded updates install the next time the user closes Mirlume.
+  autoUpdater.on('update-available', info => {
+    // Downloading is automatic; do not offer a restart until it is complete.
     if (currentWindow && !currentWindow.isDestroyed()) {
-      currentWindow.setTitle('Mirlume — update ready (installs on exit)');
+      currentWindow.setTitle('Mirlume — downloading update v' + info.version);
+    }
+  });
+  autoUpdater.on('update-downloaded', async info => {
+    // Only ask once per downloaded version, even if checkForUpdates runs again.
+    const version = info?.version || 'unknown';
+    if (promptedVersion === version) return;
+    promptedVersion = version;
+    const win = currentWindow && !currentWindow.isDestroyed() ? currentWindow : null;
+    if (win) {
+      win.setTitle('Mirlume — update ready (restart or install on exit)');
+      if (win.isMinimized()) win.restore();
+      win.show();
+      win.focus();
+    }
+    try {
+      const options = makeUpdateReadyDialog(version);
+      const { response } = win
+        ? await dialog.showMessageBox(win, options)
+        : await dialog.showMessageBox(options);
+      if (response === 0) {
+        // Called only after update-downloaded. v6 electron-updater expects
+        // (isSilent, isForceRunAfter): exit, install silently, and relaunch.
+        autoUpdater.quitAndInstall(true, true);
+      }
+      // Choosing Later leaves autoInstallOnAppQuit enabled: the update installs
+      // when the user closes Mirlume normally, not while they're on a call.
+    } catch (error) {
+      console.warn('Could not show the update prompt:', error);
+      // Safe fallback: downloaded update still installs on normal app exit.
     }
   });
   const check = () => autoUpdater.checkForUpdates().catch(error => console.warn('Update check failed:', error.message));
