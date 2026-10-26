@@ -25,6 +25,10 @@ jobs:
           node-version: '22'
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+      - name: Validate update prompt and Electron main process
+        run: |
+          node --check electron/main.cjs
+          node --test tests/update-prompt.test.cjs
       - name: Build portable app and installer
         run: npm run dist:win
         env:
