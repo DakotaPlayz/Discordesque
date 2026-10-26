@@ -7,6 +7,7 @@ import { configured, confirmationUrl, supabase } from './lib/supabase.js';
 import { ChannelAttachments, ChannelUpload } from './components/ChannelAttachments.jsx';
 import DirectMessages from './components/DirectMessages.jsx';
 import { useVoiceCalls, VoiceCallPanel } from './components/VoiceCalls.jsx';
+import AndroidUpdateNotice from './components/AndroidUpdateNotice.jsx';
 import ContextMenu from './components/ContextMenu.jsx';
 import {Bell,BellOff,CheckCheck,FolderHeart,FolderInput,LogOut as LeaveIcon,Eye,EyeOff,Lock,Mail,UserRound,VolumeX} from 'lucide-react';
 import {IdentityStudio,PersonAvatar,MediaImage,ProfilePeek} from './components/IdentityStudio.jsx';
@@ -714,5 +715,5 @@ export default function App() {
       setShowConfirmation(false);
     }} />;
   }
-  return session ? <ChatApp key={session.user.id} session={session} /> : <AuthScreen />;;
+  return <><AndroidUpdateNotice />{session ? <ChatApp key={session.user.id} session={session} /> : <AuthScreen />}</>;
 }
