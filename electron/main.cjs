@@ -173,11 +173,17 @@ app.whenReady().then(() => {
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
     const types = details?.mediaTypes || [];
     if (permission === 'display-capture') {
+      // Electron 45+ reports screen capture separately from camera/microphone.
       callback(isOwnWindow(webContents));
       return;
     }
-    callback(permission === 'media' && isOwnWindow(webContents)
-      && types.includes('audio') && !types.includes('video'));
+    // Electron 37 (our packaged runtime) sends screen requests as 'media'
+    // with an empty mediaTypes list. The explicit display-source picker below
+    // is still REQUIRED and prevents silent or unintended screen capture.
+    callback(permission === 'media' && isOwnWindow(webContents) && (
+      (types.includes('audio') && !types.includes('video')) ||
+      types.length === 0
+    ));
   });
   // Do not silently pick a monitor: show an explicit native source picker for
   // each request. The person sharing can cancel without sending any pixels.
