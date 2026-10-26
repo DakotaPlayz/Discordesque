@@ -2,21 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
 import { version as installedVersion } from '../../package.json';
+import { newerVersion } from '../lib/versionCheck.js';
 
 const RELEASE_API = 'https://api.github.com/repos/DakotaPlayz/Discordesque/releases/latest';
 const CHECK_EVERY_MS = 4 * 60 * 60 * 1000;
-
-export function newerVersion(remote, local) {
-  const matchRemote = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(String(remote || ''));
-  const matchLocal = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(String(local || ''));
-  if (!matchRemote || !matchLocal) return false;
-  for (let i = 1; i <= 3; i++) {
-    const left = Number(matchRemote[i]), right = Number(matchLocal[i]);
-    if (left > right) return true;
-    if (left < right) return false;
-  }
-  return false;
-}
 
 export default function AndroidUpdateNotice() {
   const [update, setUpdate] = useState(null);
