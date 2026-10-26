@@ -227,7 +227,7 @@ function ChatApp({ session }) {
       setError('Only the server owner can delete this server.');
       return;
     }
-    // window.prompt() is unreliable in Android WebViews and packaged Electron.
+    // Native browser text-input dialogs are unreliable in Android WebViews and packaged Electron.
     // A normal React dialog also works with touch, mouse, and keyboard.
     setDeleteError('');
     setDeleteTarget({ id: item.id, name: item.name, owner_id: item.owner_id });
