@@ -84,8 +84,15 @@ export function useVoiceCalls(uid) {
     };
     pc.onicecandidate = (event) => {
       if (event.candidate && currentRef.current === current) {
-        void signal(current, 'candidate', { candidate: event.candidate.toJSON() })
-          .catch(e => console.warn('Could not send ICE candidate:', e));
+        const candidate = event.candidate.toJSON();
+        // Never publish ICE candidates before the offer; the recipient might
+        // receive and discard them before it knows the call ID.
+        if (current.phase === 'calling' && !current.offerSent) {
+          current.pendingOutgoingCandidates.push(candidate);
+        } else {
+          void signal(current, 'candidate', { candidate })
+            .catch(e => console.warn('Could not send ICE candidate:', e));
+        }
       }
     };
     pc.onconnectionstatechange = () => {
@@ -119,7 +126,7 @@ export function useVoiceCalls(uid) {
     setError('');
     const current = {
       id: crypto.randomUUID(), conversationId, peerId, peerName,
-      phase: 'calling', pc: null, localStream: null, pendingCandidates: [],
+      phase: 'calling', pc: null, localStream: null, pendingCandidates: [], pendingOutgoingCandidates: [], offerSent: false,
       remoteDescriptionSet: false
     };
     currentRef.current = current;
@@ -131,6 +138,10 @@ export function useVoiceCalls(uid) {
       await pc.setLocalDescription(offer);
       if (currentRef.current !== current) return;
       await signal(current, 'offer', { description: pc.localDescription.toJSON() });
+      current.offerSent = true;
+      for (const candidate of current.pendingOutgoingCandidates.splice(0)) {
+        void signal(current, 'candidate', { candidate }).catch(e => console.warn('Could not send ICE candidate:', e));
+      }
       scheduleTimeout(current);
     } catch (e) {
       if (currentRef.current === current) finish(e.message || 'Unable to start voice call.');
