@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft, ArrowRight, CheckCheck, Edit3, LogOut, Menu, MessageCircle,
-  Plus, Search, Send, Settings2, ShieldCheck, Users, X
+  Plus, Search, Send, Settings2, ShieldCheck, Users, X, Phone
 } from 'lucide-react';
 import { supabase } from '../lib/supabase.js';
 import FileTransfers from './FileTransfers.jsx';
@@ -21,7 +21,7 @@ function InitialAvatar({ name, own = false, size = 'normal', path }) {
   return <PersonAvatar name={name} own={own} path={path} className={'dm-avatar '+size}/>;
 }
 
-export default function DirectMessages({ session, servers, displayName, profile, openProfile, sidebarOpen, setSidebarOpen, targetPeer }) {
+export default function DirectMessages({ session, servers, displayName, profile, openProfile, sidebarOpen, setSidebarOpen, targetPeer, voice }) {
   const uid = session.user.id;
   const [threads, setThreads] = useState([]);
   const [preferences,setPreferences] = useState({});
@@ -329,7 +329,7 @@ export default function DirectMessages({ session, servers, displayName, profile,
         <button className="icon-button menu-button" title="Show messages" aria-label="Show conversations" onClick={() => setSidebarOpen(true)}><Menu size={21}/></button>
         {active ? <><button type="button" className="profile-icon-button" onClick={()=>setPeek(peerMap[activePerson]||null)}><InitialAvatar name={peerName} size="tiny" path={peerMap[activePerson]?.avatar_path}/></button><strong>{peerName}</strong><span className="header-divider"/><span className="header-description">Private conversation</span></>
           : <><MessageCircle className="header-hash" size={21}/><strong>Direct Messages</strong><span className="header-description">A quieter place to connect</span></>}
-        <div className="chat-header-right"><ShieldCheck size={16}/> Private</div>
+        <div className="chat-header-right">{active && <button type="button" className="icon-button" aria-label="Start voice call" title="Start voice call" disabled={Boolean(voice?.call) || Boolean(preferences[activeId]?.blocked)} onClick={() => voice?.startCall(activeId, activePerson, peerName)}><Phone size={20}/></button>}<ShieldCheck size={16}/> Private</div>
       </header>
       <div className="message-scroll">
         {friendsView ? <FriendsPanel session={session} onMessage={begin}/> : !active ? <div className="empty-chat dm-hero">
