@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Phone, PhoneOff, Mic, MicOff, Volume2 } from 'lucide-react';
 import { supabase } from '../lib/supabase.js';
+import { CallRingtone } from './CallRingtone.jsx';
 
 const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }];
 const RING_TIMEOUT_MS = 60000;
@@ -130,7 +131,7 @@ export function useVoiceCalls(uid) {
       remoteDescriptionSet: false
     };
     currentRef.current = current;
-    setCall({ id: current.id, phase: 'calling', peerName });
+    setCall({ id: current.id, phase: 'calling', direction: 'outgoing', peerName });
     try {
       const pc = await attachPeer(current);
       if (!pc) return;
@@ -200,7 +201,7 @@ export function useVoiceCalls(uid) {
       if (!current.offer?.sdp || current.offer.type !== 'offer') return;
       currentRef.current = current;
       setError('');
-      setCall({ id: current.id, phase: 'incoming', peerName: current.peerName });
+      setCall({ id: current.id, phase: 'incoming', direction: 'incoming', peerName: current.peerName });
       scheduleTimeout(current);
       const { data } = await supabase.from('profiles').select('display_name').eq('id', current.peerId).maybeSingle();
       if (currentRef.current === current && data?.display_name) {
@@ -290,6 +291,7 @@ export function VoiceCallPanel({ voice }) {
 
   return <>
     <audio ref={audioRef} autoPlay playsInline />
+    <CallRingtone call={voice.call} />
     {voice.error && <div className="voice-call-notice" role="alert">
       <span>{voice.error}</span>
       <button type="button" aria-label="Dismiss voice call message" onClick={voice.dismissError}>×</button>
@@ -300,7 +302,7 @@ export function VoiceCallPanel({ voice }) {
         <span><strong>{voice.call.peerName}</strong>
           <small>{{
             incoming: 'Incoming voice call',
-            calling: 'Calling…',
+            calling: 'Ringing…',
             connecting: 'Connecting…',
             connected: 'Voice call connected',
             reconnecting: 'Reconnecting…'
