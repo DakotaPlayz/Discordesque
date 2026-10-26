@@ -1,6 +1,6 @@
 {
   "name": "mirlume",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
@@ -35,7 +35,8 @@
     "electron-builder": "^26.0.12",
     "vite": "^7.1.5",
     "@capacitor/assets": "^3.0.5",
-    "sharp": "^0.34.4"
+    "sharp": "^0.34.4",
+    "electron-updater": "^6.6.2"
   },
   "build": {
     "appId": "io.mirlume.chat",
@@ -73,6 +74,14 @@
       "createDesktopShortcut": false,
       "shortcutName": "Mirlume",
       "include": "build/installer.nsh"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "DakotaPlayz",
+        "repo": "Discordesque",
+        "releaseType": "release"
+      }
+    ]
   }
 }
