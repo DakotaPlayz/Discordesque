@@ -8,6 +8,10 @@ on:
     branches: [main]
     tags: ['v*']
 
+concurrency:
+  group: mirlume-windows-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
 
