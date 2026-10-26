@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, ipcMain, dialog, session } = require('electron');
+const { app, BrowserWindow, shell, ipcMain, dialog, session, desktopCapturer } = require('electron');
 const fs = require('node:fs/promises');
 const crypto = require('node:crypto');
 const path = require('node:path');
@@ -163,17 +163,60 @@ function initializeAutoUpdates() {
 }
 
 app.whenReady().then(() => {
-  // Allow microphone-only WebRTC requests from Mirlume's own packaged UI.
-  // Never allow video, screen capture, or arbitrary external origins.
+  // Only Mirlume's own packaged window can ask for WebRTC microphone or
+  // screen capture; no arbitrary web content, navigation, or camera access.
   const isOwnWindow = (webContents) => webContents === currentWindow?.webContents
     && webContents.getURL().startsWith('file://');
   session.defaultSession.setPermissionCheckHandler((webContents, permission) =>
-    permission === 'media' && isOwnWindow(webContents)
+    (permission === 'media' || permission === 'display-capture') && isOwnWindow(webContents)
   );
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
     const types = details?.mediaTypes || [];
+    if (permission === 'display-capture') {
+      callback(isOwnWindow(webContents));
+      return;
+    }
     callback(permission === 'media' && isOwnWindow(webContents)
       && types.includes('audio') && !types.includes('video'));
+  });
+  // Do not silently pick a monitor: show an explicit native source picker for
+  // each request. The person sharing can cancel without sending any pixels.
+  session.defaultSession.setDisplayMediaRequestHandler(async (request, callback) => {
+    const win = currentWindow;
+    if (!win || win.isDestroyed() || !isOwnWindow(win.webContents) ||
+        request.frame !== request.frame?.top || !request.videoRequested) {
+      callback(null);
+      return;
+    }
+    try {
+      const sources = await desktopCapturer.getSources({
+        types: ['screen', 'window'],
+        thumbnailSize: { width: 160, height: 90 }
+      });
+      const options = sources.slice(0, 14);
+      if (!options.length) { callback(null); return; }
+      const buttons = [...options.map(source =>
+        (source.id.startsWith('screen:') ? 'Screen: ' : 'Window: ') + source.name
+      ), 'Cancel'];
+      const { response } = await dialog.showMessageBox(win, {
+        type: 'question',
+        title: 'Mirlume — Share your screen',
+        message: 'Choose a screen or window to share with your friend.',
+        detail: 'Only the selected screen or window will be shared. You can stop at any time.',
+        buttons,
+        defaultId: buttons.length - 1,
+        cancelId: buttons.length - 1,
+        noLink: true
+      });
+      if (win.isDestroyed() || response < 0 || response >= options.length) {
+        callback(null);
+        return;
+      }
+      callback({ video: options[response] });
+    } catch (error) {
+      console.warn('Screen source picker failed:', error);
+      callback(null);
+    }
   });
   initializeAutoUpdates();
   createWindow();
