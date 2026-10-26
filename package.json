@@ -68,7 +68,11 @@
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "createStartMenuShortcut": true,
+      "createDesktopShortcut": false,
+      "shortcutName": "Mirlume",
+      "include": "build/installer.nsh"
     }
   }
 }
