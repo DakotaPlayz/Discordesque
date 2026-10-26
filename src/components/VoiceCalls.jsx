@@ -269,6 +269,10 @@ export function useVoiceCalls(uid) {
       track.contentHint = 'detail'; // Sharper text, code, and desktop images.
       track.onended = () => { void stopScreenShare(); };
       await transceiver.sender.replaceTrack(track);
+      if (currentRef.current !== current) {
+        display.getTracks().forEach(t => t.stop());
+        return;
+      }
       current.screenStream = display;
       const parameters = transceiver.sender.getParameters();
       if (parameters.encodings?.length) {
@@ -391,6 +395,7 @@ export function useVoiceCalls(uid) {
       clearTimeout(timeoutRef.current);
       const c = currentRef.current;
       currentRef.current = null;
+      c?.screenStream?.getTracks().forEach(track => { track.onended = null; track.stop(); });
       c?.localStream?.getTracks().forEach(track => track.stop());
       c?.pc?.close();
     };
@@ -449,7 +454,7 @@ export function VoiceCallPanel({ voice }) {
       </div>}
       {voice.sharingScreen && <div className="voice-screen-status" role="status">
         <MonitorUp size={16}/> Sharing your screen{voice.screenInfo?.width && voice.screenInfo?.height
-          ? ' · ' + voice.screenInfo.width + '×' + voice.screenInfo.height + (voice.screenInfo.fps ? ' · target ' + Math.round(voice.screenInfo.fps) + ' FPS' : '')
+          ? ' · ' + voice.screenInfo.width + '×' + voice.screenInfo.height + (voice.screenInfo.fps ? ' · capture ' + Math.round(voice.screenInfo.fps) + ' FPS' : '')
           : ' · up to 60 FPS'}
       </div>}
       <div className="voice-call-actions">
