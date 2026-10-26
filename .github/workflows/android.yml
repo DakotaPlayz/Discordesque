@@ -33,8 +33,8 @@ jobs:
       - uses: android-actions/setup-android@v4
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Test Android update version detection
-        run: node --test tests/versionCheck.test.js
+      - name: Test Android safe areas and update version detection
+        run: node --test tests/versionCheck.test.js tests/safe-zones.test.mjs
       - name: Build web assets
         run: npm run build
         env:
