@@ -21,11 +21,21 @@ async function token(forceRefresh=false){
 }
 async function request(url,options={}){
   let bearer=await token();
-  let result=await fetch(base+url,{...options,headers:{Authorization:'Bearer '+bearer,...options.headers}});
+  const fetchFromWorker = async accessToken => {
+    try {
+      return await fetch(base+url,{...options,headers:{Authorization:'Bearer '+accessToken,...options.headers}});
+    } catch (err) {
+      if (err instanceof TypeError) {
+        throw Error('Could not reach Mirlume file storage. On Android this may be blocked by the Cloudflare Worker origin settings (https://localhost), or the Worker may be offline. Ask the server owner to deploy the latest Cloudflare R2 Worker.');
+      }
+      throw err;
+    }
+  };
+  let result=await fetchFromWorker(bearer);
   // A cached token may have expired. Refresh it once before showing an error.
   if(result.status===401){
     bearer=await token(true);
-    result=await fetch(base+url,{...options,headers:{Authorization:'Bearer '+bearer,...options.headers}});
+    result=await fetchFromWorker(bearer);
   }
   if(!result.ok){
     const json=await result.json().catch(()=>({}));
