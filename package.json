@@ -26,7 +26,8 @@
     "react-dom": "^19.1.1",
     "tus-js-client": "^4.3.1",
     "electron-updater": "^6.6.2",
-    "@capacitor/browser": "^7.0.0"
+    "@capacitor/browser": "^7.0.0",
+    "@capacitor-community/safe-area": "^7.0.0"
   },
   "devDependencies": {
     "@capacitor/android": "^7.4.0",
