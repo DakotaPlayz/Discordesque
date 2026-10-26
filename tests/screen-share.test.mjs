@@ -7,10 +7,12 @@ const electron = readFileSync('electron/main.cjs', 'utf8');
 const styles = readFileSync('src/voice-calls.css', 'utf8');
 const signaling = readFileSync('supabase/voice-calls-v0.5.6.sql', 'utf8');
 
-test('voice calls negotiate a reusable video transceiver before the offer', () => {
-  const transceiver = calls.indexOf("pc.addTransceiver('video', { direction: 'sendrecv' })");
-  const offer = calls.indexOf('const offer = await pc.createOffer()');
-  assert.ok(transceiver > 0 && transceiver < offer);
+test('voice calls stay audio-only until sharing is explicitly requested', () => {
+  const attach = calls.slice(calls.indexOf('const attachPeer ='), calls.indexOf('const flushCandidates ='));
+  const share = calls.slice(calls.indexOf('const startScreenShare ='), calls.indexOf('const toggleMute ='));
+  assert.doesNotMatch(attach, /addTransceiver/);
+  assert.match(share, /addTransceiver\('video', \{ direction: 'sendrecv' \}\)/);
+  assert.match(share, /renegotiate: true/);
   assert.match(calls, /transceiver\.sender\.replaceTrack\(track\)/);
   assert.match(calls, /screenTransceiver\.sender\.replaceTrack\(null\)/);
   assert.match(calls, /track\.onunmute = show/);
