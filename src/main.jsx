@@ -7,8 +7,8 @@ import './refine.css';
 import './studio.css';
 import './context-menus.css';
 import './voice-calls.css';
-import './safe-zones.css';
 import './server-delete.css';
+import './safe-zones.css';
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
