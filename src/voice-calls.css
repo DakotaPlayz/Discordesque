@@ -74,8 +74,8 @@
 
 /* Encrypted peer-to-peer screen video inside the existing one-to-one call. */
 .voice-call-panel.with-screen {
-  width: min(900px, calc(100vw - 28px));
-  max-height: calc(100dvh - 35px);
+  width: min(900px, calc(100vw - var(--mirlume-safe-left, 0px) - var(--mirlume-safe-right, 0px) - 28px));
+  max-height: calc(100dvh - var(--mirlume-safe-top, 0px) - var(--mirlume-safe-bottom, 0px) - 24px);
   overflow-y: auto;
 }
 .voice-screen-button {
@@ -143,10 +143,10 @@
 }
 @media (max-width: 540px) {
   .voice-call-panel.with-screen {
-    right: 8px;
-    top: 8px;
-    width: calc(100vw - 16px);
-    max-height: calc(100dvh - 16px);
+    right: calc(var(--mirlume-safe-right, 0px) + 8px);
+    top: calc(var(--mirlume-safe-top, 0px) + 8px);
+    width: calc(100vw - var(--mirlume-safe-left, 0px) - var(--mirlume-safe-right, 0px) - 16px);
+    max-height: calc(100dvh - var(--mirlume-safe-top, 0px) - var(--mirlume-safe-bottom, 0px) - 16px);
   }
   .voice-screen-video { min-height: 150px; max-height: 45dvh; }
   .voice-screen-button { flex: 1; }
