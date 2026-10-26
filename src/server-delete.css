@@ -1,0 +1,69 @@
+
+/* Shared touch/mouse server deletion confirmation (no browser prompt). */
+.server-header-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 3px;
+}
+.server-header-delete { color: #ef9fa5; }
+.server-header-delete:hover,
+.server-header-delete:focus-visible {
+  color: #ffe4e6;
+  background: #8c344540;
+}
+.delete-server-confirmation {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.delete-server-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  color: #f5e1e4;
+}
+.delete-server-warning > svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: #ff9da8;
+}
+.delete-server-warning strong {
+  display: block;
+  color: #fff;
+  overflow-wrap: anywhere;
+  font-size: 15px;
+}
+.delete-server-warning p {
+  margin: 10px 0 0;
+  line-height: 1.5;
+  color: #cbd5e1;
+}
+.delete-server-confirm-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  min-height: 44px;
+  border: none;
+  border-radius: 10px;
+  background: #b5364c;
+  color: white;
+  font-weight: 750;
+  cursor: pointer;
+}
+.delete-server-confirm-button:hover:not(:disabled) { background: #d24359; }
+.delete-server-confirm-button:disabled { opacity: .65; cursor: wait; }
+.delete-server-confirm-button:focus-visible { outline: 2px solid #f7a5b3; outline-offset: 3px; }
+@media (max-width: 700px) {
+  .server-header-actions .icon-button {
+    min-width: 40px;
+    min-height: 44px;
+  }
+  .delete-server-confirmation .modal-actions {
+    display: flex;
+    gap: 10px;
+  }
+  .delete-server-confirmation .modal-actions button { flex: 1 1 auto; }
+}
