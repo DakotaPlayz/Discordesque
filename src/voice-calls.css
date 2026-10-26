@@ -44,3 +44,29 @@
   .voice-call-panel { top: 8px; right: 8px; width: calc(100vw - 16px); }
   .voice-call-notice { bottom: 8px; right: 8px; width: calc(100vw - 16px); }
 }
+
+/* Audible one-to-one calls and update availability notices. */
+.voice-enable-ring {
+  position: fixed; top: 164px; right: 32px; z-index: 1612;
+  padding: 8px 12px; color: #fff; background: #475a84;
+  border: 1px solid #819ad3; border-radius: 8px; cursor: pointer;
+}
+.android-update-banner {
+  position: fixed; z-index: 1800; bottom: 18px; right: 18px;
+  width: min(400px, calc(100vw - 28px)); padding: 16px;
+  box-sizing: border-box; border: 1px solid #6682a9;
+  border-radius: 14px; background: #1e2736; color: #f5f7fc;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .5);
+  font-size: 13px;
+}
+.android-update-header { display: flex; justify-content: space-between; gap: 10px; align-items: start; }
+.android-update-header strong { font-size: 15px; }
+.android-update-header button { color: inherit; background: transparent; border: 0; font-size: 21px; cursor: pointer; }
+.android-update-banner p { margin: 10px 0; line-height: 1.45; }
+.android-update-warning { color: #f1c18d; font-size: 12px; }
+.android-update-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; flex-wrap: wrap; }
+.android-update-actions button { cursor: pointer; font-size: 13px; }
+@media (max-width: 540px) {
+  .android-update-banner { right: 8px; bottom: 8px; width: calc(100vw - 16px); }
+  .voice-enable-ring { right: 20px; top: 166px; }
+}
