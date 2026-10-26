@@ -1,0 +1,122 @@
+/* Mirlume safe areas (Android WebView, iOS Safari, and display cutouts).
+ * Capacitor 7 SafeArea plugin pads the native WebView and zeros env() on older
+ * Chromium; modern WebViews expose true env() insets. Never add a hard-coded
+ * 24px/48px Android bar offset or the plugin fallback would double-pad it.
+ */
+:root {
+  --mirlume-safe-top: env(safe-area-inset-top, 0px);
+  --mirlume-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --mirlume-safe-left: env(safe-area-inset-left, 0px);
+  --mirlume-safe-right: env(safe-area-inset-right, 0px);
+}
+
+/* Space for both types of Android navigation bars, curved corners, cutouts,
+ * and landscape side cutouts. The full-window background still fills the bars.
+ */
+.app-shell {
+  box-sizing: border-box;
+  padding-top: var(--mirlume-safe-top);
+  padding-bottom: var(--mirlume-safe-bottom);
+  padding-left: var(--mirlume-safe-left);
+  padding-right: var(--mirlume-safe-right);
+  height: 100dvh;
+  min-height: 0;
+}
+.app-shell > .chat,
+.app-shell > .channel-sidebar,
+.app-shell > .dm-sidebar {
+  min-height: 0;
+}
+.chat-header, .server-header, .account-bar {
+  flex-shrink: 0;
+}
+.splash, .auth-splash, .loading-screen {
+  box-sizing: border-box;
+  padding-top: max(18px, calc(var(--mirlume-safe-top) + 18px));
+  padding-bottom: max(18px, calc(var(--mirlume-safe-bottom) + 18px));
+  padding-left: max(18px, calc(var(--mirlume-safe-left) + 18px));
+  padding-right: max(18px, calc(var(--mirlume-safe-right) + 18px));
+}
+
+/* Modals and profile sheets are fixed to the visual viewport rather than
+ * inside .app-shell, so give them their own insets. */
+.dialog-backdrop, .profile-peek-backdrop {
+  padding-top: max(14px, calc(var(--mirlume-safe-top) + 14px));
+  padding-bottom: max(14px, calc(var(--mirlume-safe-bottom) + 14px));
+  padding-left: max(14px, calc(var(--mirlume-safe-left) + 14px));
+  padding-right: max(14px, calc(var(--mirlume-safe-right) + 14px));
+}
+.dialog, .profile-peek {
+  max-height: calc(100dvh - var(--mirlume-safe-top) - var(--mirlume-safe-bottom) - 28px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Floating elements must stay visible over Android's three-button bar
+ * and gesture-navigation pill. */
+.voice-call-panel {
+  top: calc(var(--mirlume-safe-top) + 12px);
+  right: calc(var(--mirlume-safe-right) + 12px);
+  width: min(380px, calc(100vw - var(--mirlume-safe-left) - var(--mirlume-safe-right) - 24px));
+  max-height: calc(100dvh - var(--mirlume-safe-top) - var(--mirlume-safe-bottom) - 24px);
+  overflow-y: auto;
+}
+.voice-call-notice, .android-update-banner {
+  bottom: calc(var(--mirlume-safe-bottom) + 12px);
+  right: calc(var(--mirlume-safe-right) + 12px);
+  width: min(400px, calc(100vw - var(--mirlume-safe-left) - var(--mirlume-safe-right) - 24px));
+  max-height: calc(100dvh - var(--mirlume-safe-top) - var(--mirlume-safe-bottom) - 24px);
+  overflow-y: auto;
+}
+.voice-enable-ring {
+  top: calc(var(--mirlume-safe-top) + 165px);
+  right: calc(var(--mirlume-safe-right) + 20px);
+}
+.mctx-panel {
+  max-height: calc(100dvh - var(--mirlume-safe-top) - var(--mirlume-safe-bottom) - 16px);
+}
+
+@media (max-width: 700px) {
+  /* Mobile chat is position:absolute; inset:0 would otherwise ignore the
+   * parent's safe-area padding and put its header UNDER the Android clock.
+   */
+  .app-shell > .chat {
+    top: var(--mirlume-safe-top);
+    bottom: var(--mirlume-safe-bottom);
+    left: var(--mirlume-safe-left);
+    right: var(--mirlume-safe-right);
+    min-height: 0;
+  }
+  .composer-area {
+    /* Already above the system bar due to chat bounds: don't pad twice. */
+    padding-bottom: 12px;
+  }
+  .file-popover, .upload-popover {
+    bottom: calc(var(--mirlume-safe-bottom) + 88px);
+    left: calc(var(--mirlume-safe-left) + 10px);
+    width: calc(100vw - var(--mirlume-safe-left) - var(--mirlume-safe-right) - 20px);
+    max-height: calc(100dvh - var(--mirlume-safe-top) - var(--mirlume-safe-bottom) - 110px);
+  }
+  .dm-transfer-state {
+    bottom: calc(var(--mirlume-safe-bottom) + 96px);
+    left: calc(var(--mirlume-safe-left) + 10px);
+    width: calc(100vw - var(--mirlume-safe-left) - var(--mirlume-safe-right) - 20px);
+  }
+  .voice-call-panel {
+    top: calc(var(--mirlume-safe-top) + 8px);
+    right: calc(var(--mirlume-safe-right) + 8px);
+    width: calc(100vw - var(--mirlume-safe-left) - var(--mirlume-safe-right) - 16px);
+  }
+  .voice-call-notice, .android-update-banner {
+    right: calc(var(--mirlume-safe-right) + 8px);
+    bottom: calc(var(--mirlume-safe-bottom) + 8px);
+    width: calc(100vw - var(--mirlume-safe-left) - var(--mirlume-safe-right) - 16px);
+  }
+}
+
+/* The keyboard may reduce the dynamic viewport. Keep primary actions inside
+ * that resized viewport without locking them to a pixel-based screen height.
+ */
+@supports (height: 100dvh) {
+  .app-shell { height: 100dvh; }
+}
