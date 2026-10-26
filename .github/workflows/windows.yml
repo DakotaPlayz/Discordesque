@@ -28,8 +28,26 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
           VITE_ATTACHMENT_SERVER_URL: ${{ vars.VITE_ATTACHMENT_SERVER_URL }}
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-      - name: Publish tagged Windows installer as GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+      # An installed NSIS build checks GitHub Releases (not Actions artifacts).
+      # Publish only when the package version is new to avoid overwriting an
+      # existing release with binaries bearing the same version number.
+      - name: Check whether this version already has a release
+        id: release_check
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if gh release view "v$version" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "Release v$version already exists; skipping publish."
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+            echo "Version v$version has no release; publishing when build passes."
+          fi
+      - name: Publish versioned Windows installer and update manifest
+        if: startsWith(github.ref, 'refs/tags/v') || steps.release_check.outputs.publish == 'true'
         run: npx electron-builder --win nsis --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
