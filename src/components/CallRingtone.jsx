@@ -86,7 +86,7 @@ export function CallRingtone({ call }) {
       clearInterval(timer);
       cancelCurrent();
     };
-  }, [call?.id, mode]);
+  }, [call?.id, mode, audioBlocked]);
 
   if (!mode || !audioBlocked) return null;
   return <button className="voice-enable-ring" type="button" onClick={async () => {
