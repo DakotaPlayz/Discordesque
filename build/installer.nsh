@@ -36,12 +36,12 @@ FunctionEnd
   ; electron-builder still creates the Start Menu entry by itself.
   ; Handle desktop choice here instead of its unconditional shortcut setting.
   ${If} $MirlumeDesktopShortcutChoice == ${BST_CHECKED}
-    CreateShortCut "$DESKTOP\\Mirlume.lnk" "$INSTDIR\\Mirlume.exe"
+    CreateShortCut "$DESKTOP\Mirlume.lnk" "$INSTDIR\Mirlume.exe"
   ${Else}
-    Delete "$DESKTOP\\Mirlume.lnk"
+    Delete "$DESKTOP\Mirlume.lnk"
   ${EndIf}
 !macroend
 
 !macro customUnInstall
-  Delete "$DESKTOP\\Mirlume.lnk"
+  Delete "$DESKTOP\Mirlume.lnk"
 !macroend
