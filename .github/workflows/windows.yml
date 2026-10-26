@@ -54,6 +54,16 @@ jobs:
             echo "publish=true" >> "$GITHUB_OUTPUT"
             echo "Version v$version has no release; publishing when build passes."
           fi
+      - name: Ensure version tag and GitHub release exist
+        if: startsWith(github.ref, 'refs/tags/v') || steps.release_check.outputs.publish == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if ! gh release view "v$version" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "v$version" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Mirlume v$version" --notes "Windows installer and Android APK builds for Mirlume v$version."
+          fi
       - name: Publish versioned Windows installer and update manifest
         if: startsWith(github.ref, 'refs/tags/v') || steps.release_check.outputs.publish == 'true'
         run: npx electron-builder --win nsis --publish always
