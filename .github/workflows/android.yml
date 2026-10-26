@@ -1,17 +1,28 @@
 name: Build Mirlume Android
 
 on:
-  push:
-    branches: [main]
-  pull_request:
+  # Build Android only after the matching Windows release workflow succeeds.
+  workflow_run:
+    workflows: [Build Mirlume Windows]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: mirlume-android-${{ github.event.workflow_run.head_branch || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
 jobs:
   android:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -28,12 +39,32 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
           VITE_ATTACHMENT_SERVER_URL: ${{ vars.VITE_ATTACHMENT_SERVER_URL }}
-      - name: Generate native project
+      - name: Generate native Android project
         run: npx cap add android
-      - name: Install Mirlume native Android streaming writer
+      - name: Sync Android plugins
+        run: npx cap sync android
+      - name: Install native writer and microphone permission
         run: node scripts/install-android-writer.mjs
-      - name: Apply Mirlume launcher icon and splash assets
+      - name: Apply launcher icon and splash assets
         run: npm run assets:android
+      - name: Set Android version from package.json
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import pkg from './package.json' with { type: 'json' };
+          const parts = pkg.version.match(/^(\d+)\.(\d+)\.(\d+)$/);
+          if (!parts) throw new Error('Android version must use major.minor.patch');
+          const [major, minor, patch] = parts.slice(1).map(Number);
+          const code = major * 1000000 + minor * 1000 + patch;
+          if (!Number.isSafeInteger(code) || code < 1 || code >= 2147483647) throw new Error('Invalid Android versionCode');
+          const file = 'android/app/build.gradle';
+          let gradle = fs.readFileSync(file, 'utf8');
+          if (!/versionCode\s+\d+/.test(gradle) || !/versionName\s+"[^"]+"/.test(gradle)) throw new Error('Version declarations missing in Android gradle');
+          gradle = gradle.replace(/versionCode\s+\d+/, 'versionCode ' + code)
+                         .replace(/versionName\s+"[^"]+"/, 'versionName "' + pkg.version + '"');
+          fs.writeFileSync(file, gradle);
+          console.log('Android version: ' + pkg.version + ' (' + code + ')');
+          NODE
       - name: Build debug APK
         run: |
           chmod +x android/gradlew
@@ -44,3 +75,17 @@ jobs:
           name: Mirlume-Android-Debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+      - name: Attach Android APK to matching GitHub release
+        if: github.event_name != 'pull_request'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          tag="v$version"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            cp android/app/build/outputs/apk/debug/app-debug.apk "Mirlume-Android-$version.apk"
+            gh release upload "$tag" "Mirlume-Android-$version.apk" --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            echo "::warning::No published release $tag yet. APK remains available under Actions artifacts."
+          fi
