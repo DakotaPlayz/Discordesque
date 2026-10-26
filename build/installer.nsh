@@ -14,6 +14,10 @@ Var MirlumeDesktopShortcutChoice
   Page custom MirlumeShortcutPageCreate MirlumeShortcutPageLeave
 !macroend
 
+; The uninstaller is compiled in a separate NSIS pass with BUILD_UNINSTALLER.
+; Its pages never call these installer-only functions, which otherwise trigger
+; NSIS warning 6010 (fatal under electron-builder).
+!ifndef BUILD_UNINSTALLER
 Function MirlumeShortcutPageCreate
   nsDialogs::Create 1018
   Pop $0
@@ -31,6 +35,7 @@ FunctionEnd
 Function MirlumeShortcutPageLeave
   ${NSD_GetState} $MirlumeDesktopCheckbox $MirlumeDesktopShortcutChoice
 FunctionEnd
+!endif
 
 !macro customInstall
   ; electron-builder still creates the Start Menu entry by itself.
